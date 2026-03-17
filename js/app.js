@@ -2916,7 +2916,7 @@ function solveDP() {
     for (let i = 0; i < N; i++) {
         const d = dayInfo[i];
         const dec = decisions[i][dpIdx(sj, sk)];
-        const chpHours = dec.hours;
+        let chpHours = dec.hours;
         const perf = d.costs[dec.loadIdx];
         const chpLoadPct = perfOptions[dec.loadIdx].load;
         const chpHeatPerH = perf.heatRate;
@@ -4951,6 +4951,34 @@ function runOptimization() {
 // 로직 플로우차트 모달
 // ═══════════════════════════════════════════════
 
+// ─── 흐름도 헬퍼 함수 ───
+function _fcNode(type, title, desc, line) {
+    const colors = { start: '#a78bfa', end: '#a78bfa', process: '#3b82f6', action: '#22c55e' };
+    const bg = { start: 'rgba(167,139,250,0.12)', end: 'rgba(167,139,250,0.12)', process: 'rgba(59,130,246,0.10)', action: 'rgba(34,197,94,0.08)' };
+    const border = colors[type] || '#3b82f6';
+    const isRound = type === 'start' || type === 'end';
+    const radius = isRound ? '24px' : '10px';
+    let h = `<div class="fc-node" style="background:${bg[type]};border:1.5px solid ${border};border-radius:${radius};padding:10px 16px;text-align:center;max-width:280px;margin:0 auto">`;
+    h += `<div style="font-size:12px;font-weight:700;color:${border}">${title}</div>`;
+    if (desc) h += `<div style="font-size:10px;color:#94a3b8;margin-top:3px;line-height:1.5">${desc}</div>`;
+    if (line) h += `<div style="font-size:9px;color:#475569;margin-top:2px;font-family:monospace">[${line}]</div>`;
+    h += '</div>';
+    return h;
+}
+function _fcArrow() {
+    return '<div style="width:2px;height:20px;background:#334155;margin:0 auto"></div>';
+}
+function _fcDiamond(question, condition, line) {
+    let h = '<div style="text-align:center;margin:0 auto;max-width:280px">';
+    h += '<div style="width:160px;height:160px;margin:0 auto;transform:rotate(45deg);background:rgba(139,92,246,0.12);border:1.5px solid rgba(139,92,246,0.5);border-radius:12px;display:flex;align-items:center;justify-content:center">';
+    h += `<div style="transform:rotate(-45deg);text-align:center;padding:8px">`;
+    h += `<div style="font-size:11px;font-weight:700;color:#c4b5fd">${question}</div>`;
+    if (condition) h += `<div style="font-size:9px;color:#7c3aed;margin-top:2px">${condition}</div>`;
+    if (line) h += `<div style="font-size:8px;color:#475569;margin-top:2px;font-family:monospace">[${line}]</div>`;
+    h += '</div></div></div>';
+    return h;
+}
+
 function showLogicFlowModal() {
     const old = document.getElementById('logicFlowOverlay');
     if (old) old.remove();
@@ -5014,6 +5042,7 @@ function showLogicFlowModal() {
 
     // 탭 콘텐츠 래퍼 (고정 높이, 내부 스크롤)
     html += '<div class="lfm-scroll" style="flex:1;overflow-y:auto;min-height:0">';
+
 
     // ═══ [1] 데이터 준비 탭 ═══
     html += '<div id="logicPanel_intro" class="logic-panel">';

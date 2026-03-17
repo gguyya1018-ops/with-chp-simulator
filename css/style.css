@@ -38,6 +38,24 @@
     text-align:left; display:none;
 }
 
+/* ─── 흐름도 ─── */
+.fc-wrap { padding:10px 0; }
+.fc-node { transition:transform .2s, box-shadow .2s; }
+.fc-node:hover { transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.fc-branch {
+    display:flex; gap:12px; justify-content:center; margin:4px 0;
+}
+.fc-branch-yes, .fc-branch-mid, .fc-branch-no {
+    flex:1; max-width:220px; text-align:center;
+}
+.fc-branch-label {
+    font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px;
+    display:inline-block; margin-bottom:4px;
+}
+.fc-branch-label.yes { color:#22c55e; background:rgba(34,197,94,0.1); }
+.fc-branch-label.mid { color:#f59e0b; background:rgba(245,158,11,0.1); }
+.fc-branch-label.no { color:#ef4444; background:rgba(239,68,68,0.1); }
+
 /* ─── 비용산출 패널 ─── */
 .cost-panel { display:none; }
 .cost-panel.active { display:block; }
