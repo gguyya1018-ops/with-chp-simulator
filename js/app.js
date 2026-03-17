@@ -4499,12 +4499,14 @@ function _updateDayDetailContent(dayIndex) {
     // 차트 데이터 업데이트 (destroy 없이)
     if (_dayDetailChart) {
         const demandData = hours.map(h => Math.round((h.demand || 0) * 10) / 10);
+        const extData = hours.map(h => Math.round((h.ext || 0) * 10) / 10);
         const chpData = hours.map(h => Math.round(h.chp * 10) / 10);
         const plbData = hours.map(h => Math.round(h.plb * 10) / 10);
         _dayDetailChart.data.datasets[0].data = hours.map(h => h.storage);
         _dayDetailChart.data.datasets[1].data = demandData;
-        _dayDetailChart.data.datasets[2].data = chpData;
-        _dayDetailChart.data.datasets[3].data = plbData;
+        _dayDetailChart.data.datasets[2].data = extData;
+        _dayDetailChart.data.datasets[3].data = chpData;
+        _dayDetailChart.data.datasets[4].data = plbData;
         // Y축 max 동적 조정 (정수, 천단위→100, 백단위→50 끊기)
         const maxHeat = Math.max(...demandData, ...chpData, ...plbData, 50);
         const yMax = niceMax(maxHeat);
@@ -4515,22 +4517,46 @@ function _updateDayDetailContent(dayIndex) {
         _dayDetailChart.update('none'); // 애니메이션 없이 즉시 업데이트
     }
 
-    // SMP 배지 업데이트 (차트 x축 정렬)
-    const smpValsEl = document.getElementById('ddm_smpVals');
-    if (smpValsEl && _dayDetailChart) {
+    // 축방열 + SMP 배지 업데이트 (차트 x축 정렬)
+    if (_dayDetailChart) {
         const ca = _dayDetailChart.chartArea;
-        const xScale = _dayDetailChart.scales.x;
-        if (ca && xScale) {
-            smpValsEl.style.marginLeft = ca.left + 'px';
-            smpValsEl.style.width = (ca.right - ca.left) + 'px';
-            let smpHtml = '';
-            for (let h = 0; h < 24; h++) {
-                const v = smpH[h];
-                const bg = v >= 150 ? '#fee2e2' : (v >= 100 ? '#fef3c7' : '#e8f5e9');
-                const tc = v >= 150 ? '#c62828' : (v >= 100 ? '#92400e' : '#2e7d32');
-                smpHtml += `<div style="flex:1;text-align:center;padding:2px 0;border-radius:3px;background:${bg};font-size:8px;font-weight:600;color:${tc}">${v > 0 ? Math.round(v) : '-'}</div>`;
+        if (ca) {
+            const ml = ca.left + 'px';
+            const w = (ca.right - ca.left) + 'px';
+
+            // 축방열량
+            const stValsEl = document.getElementById('ddm_storageVals');
+            if (stValsEl) {
+                stValsEl.style.marginLeft = ml;
+                stValsEl.style.width = w;
+                let stHtml = '';
+                for (let h = 0; h < 24; h++) {
+                    const prev = h === 0 ? (r.storageLevel || hours[0]?.storage || 0) : hours[h - 1].storage;
+                    const cur = hours[h]?.storage || 0;
+                    const diff = cur - prev;
+                    const isCharge = diff > 0;
+                    const bg = diff === 0 ? '#1a1a1a' : (isCharge ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.15)');
+                    const tc = diff === 0 ? '#555' : (isCharge ? '#60a5fa' : '#f87171');
+                    const label = diff === 0 ? '·' : (isCharge ? '+' : '') + Math.round(diff);
+                    stHtml += `<div style="flex:1;text-align:center;padding:2px 0;border-radius:3px;background:${bg};font-size:7px;font-weight:600;color:${tc}">${label}</div>`;
+                }
+                stValsEl.innerHTML = stHtml;
             }
-            smpValsEl.innerHTML = smpHtml;
+
+            // SMP
+            const smpValsEl = document.getElementById('ddm_smpVals');
+            if (smpValsEl) {
+                smpValsEl.style.marginLeft = ml;
+                smpValsEl.style.width = w;
+                let smpHtml = '';
+                for (let h = 0; h < 24; h++) {
+                    const v = smpH[h];
+                    const bg = v >= 150 ? '#fee2e2' : (v >= 100 ? '#fef3c7' : '#e8f5e9');
+                    const tc = v >= 150 ? '#c62828' : (v >= 100 ? '#92400e' : '#2e7d32');
+                    smpHtml += `<div style="flex:1;text-align:center;padding:2px 0;border-radius:3px;background:${bg};font-size:8px;font-weight:600;color:${tc}">${v > 0 ? Math.round(v) : '-'}</div>`;
+                }
+                smpValsEl.innerHTML = smpHtml;
+            }
         }
     }
 }
@@ -4572,9 +4598,15 @@ function showDayDetailModal(simResults, dayIndex) {
     // 차트
     html += '<div style="height:400px;margin-bottom:10px"><canvas id="chartDayDetail"></canvas></div>';
 
+    // 축방열량 배지 행
+    html += '<div id="ddm_storageWrap" style="position:relative;margin-top:-2px;display:flex;align-items:center">';
+    html += '<div style="font-size:8px;font-weight:700;color:#64748b;position:absolute;left:0">축방열</div>';
+    html += '<div id="ddm_storageVals" style="display:flex;position:relative"></div>';
+    html += '</div>';
+
     // SMP 배지 행 (차트 x축에 정렬)
-    html += '<div id="ddm_smpWrap" style="position:relative;margin-top:-2px;display:flex;align-items:center">';
-    html += '<div id="ddm_smpLabel" style="font-size:9px;font-weight:700;color:#64748b;position:absolute;left:0">SMP</div>';
+    html += '<div id="ddm_smpWrap" style="position:relative;margin-top:2px;display:flex;align-items:center">';
+    html += '<div id="ddm_smpLabel" style="font-size:8px;font-weight:700;color:#64748b;position:absolute;left:0">SMP</div>';
     html += '<div id="ddm_smpVals" style="display:flex;position:relative"></div>';
     html += '</div>';
 
@@ -4630,6 +4662,13 @@ function showDayDetailModal(simResults, dayIndex) {
                     borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)',
                     borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#ef4444',
                     fill: false, yAxisID: 'y', order: 1,
+                },
+                {
+                    label: '외부수열', type: 'line',
+                    data: hours.map(h => Math.round((h.ext || 0) * 10) / 10),
+                    borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)',
+                    borderWidth: 2, borderDash: [6, 3], pointRadius: 1, pointBackgroundColor: '#22c55e',
+                    fill: false, yAxisID: 'y', order: 4,
                 },
                 {
                     label: 'CHP', type: 'line',
