@@ -6,200 +6,132 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Noto Sans KR', sans-serif; background: #1a1a2e; color: #e0e0e0; }
+body { font-family: 'Noto Sans KR', sans-serif; background: #0f0f1e; color: #e0e0e0; }
 
-/* 2컬럼 */
 .wrap { display: flex; height: 100vh; }
-.left { width: 520px; min-width: 520px; overflow-y: auto; padding: 24px; border-right: 1px solid #2a2a4a; background: #16162b; position: relative; }
-.right { flex: 1; overflow-y: auto; padding: 32px 36px; background: #1a1a2e; }
+
+/* 좌측 */
+.left { width: 520px; min-width: 520px; overflow-y: auto; padding: 20px; border-right: 1px solid #2a2a4a; background: #13132a; }
+.left-title { font-size: 18px; font-weight: 800; color: #f0f0ff; margin-bottom: 4px; }
+.left-sub { font-size: 12px; color: #9090aa; margin-bottom: 14px; }
 
 /* 범례 */
-.mode-tab {
-    padding: 6px 16px; border-radius: 8px; border: 1px solid #3a3a5a; background: transparent;
-    color: #9090aa; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
-    font-family: inherit;
-}
-.mode-tab:hover { background: rgba(99,102,241,0.1); color: #c0c0e0; }
-.mode-tab.active { background: rgba(99,102,241,0.2); border-color: #6366f1; color: #a5b4fc; }
-.flow-mode { display: none; }
-.flow-mode.active { display: block; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 14px; background: #1a1a35; border-radius: 8px; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-bottom: 14px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #c0c0d8; font-weight: 600; }
+.lg-icon { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #fff; }
 
-.legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 16px; background: #20203a; border-radius: 10px; position: sticky; top: 0; z-index: 10; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #d0d0e8; font-weight: 600; }
-.leg-circle { width: 20px; height: 20px; border-radius: 50%; border: 2px solid; }
-.leg-diamond { width: 14px; height: 14px; transform: rotate(45deg); border: 2px solid; }
-.leg-rect { width: 20px; height: 14px; border-radius: 3px; border: 2px solid; }
-.leg-rrect { width: 20px; height: 14px; border-radius: 8px; border: 2px solid; }
+/* 블록 헤더 */
+.block { margin-bottom: 6px; }
+.block-head { padding: 10px 14px; background: #1e1e3a; border: 1px solid #2e2e50; border-radius: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 10px; }
+.block-head:hover { background: #252550; }
+.block-head.active { border-color: #6366f1; box-shadow: 0 0 12px rgba(99,102,241,0.15); }
+.block-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.block-info .title { font-size: 14px; font-weight: 800; color: #f0f0ff; }
+.block-info .sub { font-size: 11px; color: #8888aa; margin-top: 1px; }
 
-/* PA 스타일 노드 */
-.pa-node { display: flex; align-items: center; gap: 12px; padding: 14px 18px; margin: 0 auto; max-width: 380px; border-radius: 10px; cursor: pointer; transition: all .15s; border: 1.5px solid transparent; }
-.pa-node:hover { transform: translateX(4px); }
-.pa-node.active { border-color: #6366f1; box-shadow: 0 0 16px rgba(99,102,241,0.2); }
+/* 블록 내부 노드 */
+.block-body { padding: 4px 0 4px 18px; border-left: 2px solid #2a2a4a; margin-left: 23px; }
+.node { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: all .12s; margin: 3px 0; }
+.node:hover { background: rgba(255,255,255,0.03); transform: translateX(3px); }
+.node.active { background: rgba(99,102,241,0.1); box-shadow: inset 3px 0 0 #6366f1; }
+.node-icon { width: 24px; height: 24px; min-width: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; }
+.node .title { font-size: 13px; font-weight: 600; color: #d0d0e8; }
+.node .sub { font-size: 10px; color: #7070a0; }
 
-/* 아이콘 원 */
-.pa-icon { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+/* 분기 라벨 */
+.branch-row { display: flex; gap: 6px; margin: 3px 0 3px 36px; }
+.bl { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.bl-y { color: #4ade80; background: rgba(34,197,94,0.12); }
+.bl-n { color: #f87171; background: rgba(239,68,68,0.12); }
 
-.pa-node .info { flex: 1; }
-.pa-node .title { font-size: 15px; font-weight: 800; color: #ffffff; }
-.pa-node .sub { font-size: 12px; color: #b0b0cc; margin-top: 2px; }
+/* 색상 */
+.bg-blue { background: #3b82f6; }
+.bg-purple { background: #8b5cf6; }
+.bg-green { background: #22c55e; }
+.bg-amber { background: #f59e0b; }
+.bg-red { background: #ef4444; }
 
-/* 노드 타입별 색상 */
-.pa-trigger { background: #1e2a4a; }
-.pa-trigger .pa-icon { background: #3b82f6; color: #fff; }
-
-.pa-condition { background: #2a1e3a; }
-.pa-condition .pa-icon { background: #8b5cf6; color: #fff; width: 32px; height: 32px; min-width: 32px; transform: rotate(45deg); border-radius: 4px; }
-.pa-condition .pa-icon span { transform: rotate(-45deg); display: block; font-size: 14px; }
-
-.pa-action { background: #1e3a2a; }
-.pa-action .pa-icon { background: #22c55e; color: #fff; }
-
-.pa-scope { background: #3a2a1e; }
-.pa-scope .pa-icon { background: #f59e0b; color: #fff; }
-
-/* 연결선 */
-.pa-line { width: 2px; height: 16px; background: #3a3a5a; margin: 0 auto; margin-left: 41px; }
-
-/* 분기 */
-.pa-branches { margin-left: 41px; padding-left: 18px; border-left: 2px solid #3a3a5a; }
-.pa-branch-label { font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 4px; display: inline-block; margin: 4px 0 4px 0; }
-.pa-bl-yes { color: #4ade80; background: rgba(34,197,94,0.12); }
-.pa-bl-no { color: #f87171; background: rgba(239,68,68,0.12); }
-.pa-bl-mid { color: #fbbf24; background: rgba(245,158,11,0.12); }
-
-/* 우측 설명 */
+/* 우측 */
+.right { flex: 1; overflow-y: auto; padding: 28px 32px; background: #0f0f1e; }
 .dp { display: none; }
 .dp.active { display: block; }
-.dp h2 { font-size: 20px; font-weight: 800; color: #f0f0ff; margin-bottom: 6px; }
-.dp .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 5px; margin-bottom: 16px; }
+.dp h2 { font-size: 20px; font-weight: 800; color: #f0f0ff; margin-bottom: 6px; letter-spacing: -0.02em; }
+.dp .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 5px; margin-bottom: 16px; }
 .dp p { font-size: 14px; color: #c0c0d8; line-height: 2; margin-bottom: 14px; }
-.dp b { color: #e8e8f0; }
-.dp .fm { background: #20203a; border: 1px solid #3a3a5a; border-radius: 8px; padding: 14px 18px; font-family: 'Consolas', monospace; font-size: 13px; color: #93c5fd; margin: 14px 0; line-height: 1.9; }
+.dp b { color: #e8e8ff; }
+.dp .fm { background: #1a1a35; border: 1px solid #2e2e50; border-radius: 8px; padding: 14px 18px; font-size: 13px; color: #93c5fd; margin: 14px 0; line-height: 1.9; }
 .dp .note { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #fbbf24; margin: 14px 0; line-height: 1.8; }
 .dp .rule { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #fca5a5; margin: 14px 0; line-height: 1.8; }
-.dp .ref { font-size: 12px; color: #8888aa; font-family: monospace; margin-top: 12px; }
+.dp .ref { font-size: 12px; color: #7070a0; margin-top: 12px; }
+.dp h3 { font-size: 15px; font-weight: 700; color: #c0c0e0; margin: 20px 0 8px; }
+
+/* 다이어그램 */
+.dia { margin: 16px 0; padding: 20px; background: #12122a; border: 1px solid #2a2a4a; border-radius: 10px; overflow-x: auto; }
+.dia-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.dia-box { padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: 600; text-align: center; min-width: 60px; }
+.dia-arrow { color: #4a4a6a; font-size: 16px; }
+.dia-grid { display: grid; gap: 3px; }
+.dia-cell { width: 28px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 700; }
+.dia-label { font-size: 10px; color: #8888aa; text-align: center; margin-top: 4px; }
+.dia-bracket { border: 2px solid #3a3a5a; border-radius: 8px; padding: 12px; margin: 8px 0; }
 </style>
 </head>
 <body>
 <div class="wrap">
-
-<!-- 좌측 흐름도 -->
 <div class="left">
-<div style="font-size:16px;font-weight:800;color:#e0e0f0;margin-bottom:4px">정밀 최적화 (동적 프로그래밍)</div>
-<div style="font-size:12px;color:#9090aa;margin-bottom:12px">노드를 클릭하면 우측에 설명이 표시됩니다</div>
+<div class="left-title">정밀 최적화 흐름</div>
+<div class="left-sub">블록 또는 노드를 클릭하면 우측에 상세 설명이 표시됩니다</div>
 
 <div class="legend">
-    <div class="legend-item"><div class="leg-circle" style="border-color:#3b82f6;background:rgba(59,130,246,0.2)"></div>트리거/처리</div>
-    <div class="legend-item"><div class="leg-diamond" style="border-color:#8b5cf6;background:rgba(139,92,246,0.2)"></div>조건 판단</div>
-    <div class="legend-item"><div class="leg-rect" style="border-color:#22c55e;background:rgba(34,197,94,0.2)"></div>액션</div>
-    <div class="legend-item"><div class="leg-rrect" style="border-color:#f59e0b;background:rgba(245,158,11,0.2)"></div>범위/비교</div>
+    <div class="legend-item"><div class="lg-icon bg-blue">P</div>처리</div>
+    <div class="legend-item"><div class="lg-icon bg-purple">?</div>판단</div>
+    <div class="legend-item"><div class="lg-icon bg-green">A</div>액션</div>
+    <div class="legend-item"><div class="lg-icon bg-amber">C</div>비교</div>
 </div>
 
-<!-- DP 흐름도 -->
-<div class="pa-node pa-trigger active" onclick="sd('start')">
-    <div class="pa-icon">▶</div>
-    <div class="info"><div class="title">시작</div><div class="sub">365일 데이터 + 설정 로드</div></div>
-</div>
-<div class="pa-line"></div>
-
-<div class="pa-node pa-trigger" onclick="sd('dp_state')">
-    <div class="pa-icon">📐</div>
-    <div class="info"><div class="title">상태공간 정의</div><div class="sub">축열조(10Gcal 단위) × 정지레벨(4단계) [L2764]</div></div>
-</div>
-<div class="pa-line"></div>
-
-<div class="pa-node pa-trigger" onclick="sd('dp_cost')">
-    <div class="pa-icon">💰</div>
-    <div class="info"><div class="title">일별 비용 사전계산</div><div class="sub">부하별 netCostH, PLB 단가 [L2785]</div></div>
-</div>
-<div class="pa-line"></div>
-
-<!-- 역방향 DP -->
-<div class="pa-node pa-trigger" onclick="sd('dp_backward')">
-    <div class="pa-icon">◀</div>
-    <div class="info"><div class="title">역방향 DP (Bellman)</div><div class="sub">Day 365 → Day 1 역순 탐색 [L2812]</div></div>
-</div>
-<div class="pa-line"></div>
-
-<div class="pa-node pa-scope" onclick="sd('dp_loop')">
-    <div class="pa-icon">🔄</div>
-    <div class="info"><div class="title">각 (축열조, 정지레벨) 상태에서</div><div class="sub">~564개 상태 × 부하옵션 × 시간후보</div></div>
-</div>
-
-<div class="pa-branches">
-    <div class="pa-branch-label pa-bl-mid">각 조합마다</div>
-
-    <div class="pa-node pa-action" onclick="sd('dp_chpcost')" style="margin-left:0">
-        <div class="pa-icon">⚡</div>
-        <div class="info"><div class="title">CHP 비용 계산</div><div class="sub">chpCost = h × netCostH</div></div>
+<!-- 블록 1: 준비 -->
+<div class="block">
+    <div class="block-head active" onclick="sd('b_prep')">
+        <div class="block-num bg-blue">1</div>
+        <div class="block-info"><div class="title">준비 단계 <span style="font-size:10px;font-weight:600;color:#60a5fa;background:rgba(59,130,246,0.15);padding:2px 6px;border-radius:3px;margin-left:6px">1회 실행</span></div><div class="sub">데이터 로드 · 상태공간 정의 · 비용 사전계산</div></div>
     </div>
-
-    <div class="pa-node pa-condition" onclick="sd('dp_startup')" style="margin-left:0">
-        <div class="pa-icon"><span>?</span></div>
-        <div class="info"><div class="title">기동비용?</div><div class="sub">정지상태 → 가동 시 추가</div></div>
-    </div>
-
-    <div class="pa-node pa-action" onclick="sd('dp_storage')" style="margin-left:0">
-        <div class="pa-icon">🔋</div>
-        <div class="info"><div class="title">축열조 변화</div><div class="sub">newS = s + chpHeat − netRequired</div></div>
-    </div>
-
-    <div class="pa-node pa-condition" onclick="sd('dp_plb')" style="margin-left:0">
-        <div class="pa-icon"><span>?</span></div>
-        <div class="info"><div class="title">newS < storageMin?</div><div class="sub">PLB 강제 투입 [L2853]</div></div>
-    </div>
-
-    <div class="pa-node pa-condition" onclick="sd('dp_overflow')" style="margin-left:0">
-        <div class="pa-icon"><span>?</span></div>
-        <div class="info"><div class="title">newS > storageCap?</div><div class="sub">h>0이면 조합 제외 [L2863]</div></div>
-    </div>
-
-    <div class="pa-node pa-action" onclick="sd('dp_best')" style="margin-left:0">
-        <div class="pa-icon">🏆</div>
-        <div class="info"><div class="title">최소 비용 갱신</div><div class="sub">totalCost = CHP + 기동 + PLB + 미래비용</div></div>
+    <div class="block-body">
+        <div class="node" onclick="sd('n_data')"><div class="node-icon bg-blue">P</div><div><div class="title">365일 데이터 로드</div><div class="sub">열수요 · 외부수열 · 전력가격 · NG단가</div></div></div>
+        <div class="node" onclick="sd('n_state')"><div class="node-icon bg-blue">P</div><div><div class="title">상태공간 정의 (어떤 상황들을 비교할지)</div><div class="sub">축열조(설정값 기준) × 정지레벨 4단계</div></div></div>
+        <div class="node" onclick="sd('n_cost')"><div class="node-icon bg-amber">C</div><div><div class="title">일별 비용 사전계산</div><div class="sub">부하별 시간당 순비용 · PLB 단가</div></div></div>
     </div>
 </div>
 
-<div class="pa-line"></div>
-
-<!-- 순방향 복원 -->
-<div class="pa-node pa-trigger" onclick="sd('dp_forward')">
-    <div class="pa-icon">▶</div>
-    <div class="info"><div class="title">순방향 복원</div><div class="sub">Day 1 → 365 최적 결정 추출 [L2886]</div></div>
-</div>
-<div class="pa-line"></div>
-
-<!-- Stage 2 -->
-<div class="pa-node pa-trigger" onclick="sd('stage2')">
-    <div class="pa-icon">S2</div>
-    <div class="info"><div class="title">Stage 2: 블록 배치</div><div class="sub">overflow 거부, MP 최대 시간대 [L2923]</div></div>
-</div>
-<div class="pa-line"></div>
-
-<!-- Stage 3 -->
-<div class="pa-node pa-condition" onclick="sd('stage3')">
-    <div class="pa-icon"><span>?</span></div>
-    <div class="info"><div class="title">PLB 필요?</div><div class="sub">축열조 < storageMin [L2962]</div></div>
-</div>
-<div class="pa-branches">
-    <div class="pa-branch-label pa-bl-yes">Yes</div>
-    <div class="pa-node pa-action" onclick="sd('plb')" style="margin-left:0">
-        <div class="pa-icon">🔥</div>
-        <div class="info"><div class="title">PLB 투입</div><div class="sub">deficit 기반, 과투입 방지</div></div>
+<!-- 블록 2: 역방향 탐색 -->
+<div class="block">
+    <div class="block-head" onclick="sd('b_backward')">
+        <div class="block-num bg-purple">2</div>
+        <div class="block-info"><div class="title">역방향 탐색 (핵심) <span style="font-size:10px;font-weight:600;color:#a78bfa;background:rgba(139,92,246,0.15);padding:2px 6px;border-radius:3px;margin-left:6px">1회 실행</span></div><div class="sub">365일→1일 역순으로 각 상태의 최적 결정 탐색</div></div>
+    </div>
+    <div class="block-body">
+        <div class="node" onclick="sd('n_loop')"><div class="node-icon bg-amber">C</div><div><div class="title">모든 조합 시도</div><div class="sub">각 상태에서 부하 × 가동시간 조합 비교</div></div></div>
+        <div class="node" onclick="sd('n_chpcost')"><div class="node-icon bg-green">A</div><div><div class="title">CHP 비용 계산</div><div class="sub">가동시간 × 시간당 순비용</div></div></div>
+        <div class="node" onclick="sd('n_startup')"><div class="node-icon bg-purple">?</div><div><div class="title">기동비용 발생?</div><div class="sub">정지상태 → 가동 시 Hot/Warm/Cold 비용</div></div></div>
+        <div class="node" onclick="sd('n_storage')"><div class="node-icon bg-green">A</div><div><div class="title">축열조 변화 계산</div><div class="sub">현재잔량 + CHP열 − 열수요</div></div></div>
+        <div class="node" onclick="sd('n_plb_dp')"><div class="node-icon bg-purple">?</div><div><div class="title">축열조 부족? → PLB 투입</div><div class="sub">최소 수준 아래면 보조보일러 강제</div></div></div>
+        <div class="node" onclick="sd('n_overflow')"><div class="node-icon bg-purple">?</div><div><div class="title">축열조 넘침? → 조합 제외</div><div class="sub">상한 초과 시 해당 조합 탈락</div></div></div>
+        <div class="node" onclick="sd('n_best')"><div class="node-icon bg-green">A</div><div><div class="title">최소 비용 결정 기록</div><div class="sub">오늘 + 미래 비용이 가장 작은 조합 선택</div></div></div>
     </div>
 </div>
-<div class="pa-line"></div>
 
-<!-- Stage 4 -->
-<div class="pa-node pa-trigger" onclick="sd('stage4')">
-    <div class="pa-icon">S4</div>
-    <div class="info"><div class="title">Stage 4: 시뮬 & 집계</div><div class="sub">24h 시뮬, overflow 시 CHP 자동 감소 [L3002]</div></div>
-</div>
-<div class="pa-line"></div>
-
-<div class="pa-node pa-trigger" onclick="sd('start')">
-    <div class="pa-icon">→</div>
-    <div class="info"><div class="title">다음날</div><div class="sub">축열조 잔량 전달 · 365일 반복</div></div>
+<!-- 블록 3: 순방향 실행 -->
+<div class="block">
+    <div class="block-head" onclick="sd('b_forward')">
+        <div class="block-num bg-green">3</div>
+        <div class="block-info"><div class="title">순방향 실행 <span style="font-size:10px;font-weight:600;color:#4ade80;background:rgba(34,197,94,0.15);padding:2px 6px;border-radius:3px;margin-left:6px">365일 반복</span></div><div class="sub">1일→365일 순서로 최적 결정 추출 · 매일 Stage 2→3→4 실행</div></div>
+    </div>
+    <div class="block-body">
+        <div class="node" onclick="sd('n_extract')"><div class="node-icon bg-blue">P</div><div><div class="title">최적 결정 추출</div><div class="sub">역방향에서 기록된 결정을 1일부터 순차 적용</div></div></div>
+        <div class="node" onclick="sd('n_block')"><div class="node-icon bg-blue">P</div><div><div class="title">CHP 블록 배치 (Stage 2)</div><div class="sub">전기가격 높은 시간대 선택 · 넘침 배치 거부</div></div></div>
+        <div class="node" onclick="sd('n_plb')"><div class="node-icon bg-purple">?</div><div><div class="title">PLB 투입 판단 (Stage 3)</div><div class="sub">부족분 기반 정밀 투입 · 과투입 방지</div></div></div>
+        <div class="node" onclick="sd('n_sim')"><div class="node-icon bg-blue">P</div><div><div class="title">24시간 시뮬레이션 (Stage 4)</div><div class="sub">시간별 축열조 추적 · 넘침 시 CHP 자동 감소</div></div></div>
+        <div class="node" onclick="sd('n_agg')"><div class="node-icon bg-green">A</div><div><div class="title">일별 집계</div><div class="sub">연료비 · 전력판매 · 기동비 · CHP단가</div></div></div>
+    </div>
 </div>
 
 </div>
@@ -207,155 +139,279 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #1a1a2e; color: #e0e
 <!-- 우측 설명 -->
 <div class="right">
 
-<div class="dp active" id="dp_start">
-    <h2>시뮬레이션 시작</h2>
-    <div class="badge" style="background:#1e2a4a;color:#60a5fa">트리거</div>
-    <p>시뮬레이션이 시작되면 가장 먼저 <b>1년치 운영 데이터를 준비</b>합니다. 건물이 매일 매시간 열을 얼마나 쓰는지, 외부에서 열을 얼마나 공급받는지, 전기 시장가격은 어떻게 변하는지, 연료값은 얼마인지 — 이 모든 정보를 365일분 모아놓는 단계입니다.</p>
-    <p>이 데이터가 있어야 비로소 "언제 CHP를 켜고, 몇 시간 돌리고, 어떤 부하로 운전하는 게 가장 돈을 아끼는 방법인가"를 계산할 수 있습니다.</p>
-    <p>준비되는 핵심 정보:</p>
-    <p>• <b>시간별 열수요</b> — 아침 피크, 야간 감소 등 24시간 패턴<br>
-    • <b>외부수열량</b> — 소각장, ERG, SRF 등에서 받는 열<br>
-    • <b>시간별 전력가격</b> (SMP→MP) — CHP 전기 판매 수익<br>
-    • <b>NG단가</b> — CHP/PLB 연료비<br>
+<!-- 블록 설명 -->
+<div class="dp active" id="dp_b_prep">
+    <h2>1단계: 준비</h2>
+    <div class="badge" style="background:#1e2a4a;color:#60a5fa">준비 · 1회 실행</div>
+    <p>최적화를 시작하기 전에 필요한 모든 정보를 모으는 단계입니다.</p>
+    <p>건물의 1년치 열수요, 외부에서 받는 열, 전기 시장가격, 연료값을 365일분 준비합니다. 그리고 "축열조에 열이 얼마나 남아있고, CHP가 얼마나 쉬었는가"를 표현하는 <b>상태공간</b>을 정의합니다.</p>
+    <p>마지막으로 CHP를 각 부하(20%~100%)로 1시간 돌렸을 때 비용이 얼마나 드는지를 미리 계산해둡니다. 이렇게 해야 2단계에서 수십만 번의 비교를 빠르게 할 수 있습니다.</p>
+    <h3>이 단계에서 결정되는 것</h3>
+    <p>• 상태 개수: 축열조 = (최대용량 − 최소잔량) / 10 + 1 개 × 정지레벨 4단계<br>
+    • 부하 옵션: 최소부하(20%) ~ 100%, 10% 단위 = <b>9개</b><br>
+    • 시간 후보: 미가동(0h), 4h, 5h, ..., 24h = <b>21개</b></p>
+    <div class="dia" style="padding:28px">
+        <div class="dia-row" style="gap:16px">
+            <div class="dia-box" style="background:#1e3050;color:#60a5fa;border:1.5px solid #3b82f6;padding:16px 20px;font-size:14px;border-radius:10px">365일<br>데이터</div>
+            <div class="dia-arrow" style="font-size:24px">＋</div>
+            <div class="dia-box" style="background:#2a1e3a;color:#a78bfa;border:1.5px solid #8b5cf6;padding:16px 20px;font-size:14px;border-radius:10px">상태공간<br><span style="font-size:11px;color:#8888aa">축열조 × 정지레벨</span></div>
+            <div class="dia-arrow" style="font-size:24px">＋</div>
+            <div class="dia-box" style="background:#3a2a1e;color:#fbbf24;border:1.5px solid #f59e0b;padding:16px 20px;font-size:14px;border-radius:10px">비용표<br><span style="font-size:11px;color:#8888aa">365일 × 9부하</span></div>
+            <div class="dia-arrow" style="font-size:24px">→</div>
+            <div class="dia-box" style="background:#1e3a2a;color:#4ade80;border:1.5px solid #22c55e;padding:16px 20px;font-size:14px;border-radius:10px">2단계로</div>
+        </div>
+    </div>
+    <div class="ref">app.js [L2726~2808]</div>
+</div>
+
+<div class="dp" id="dp_b_backward">
+    <h2>2단계: 역방향 탐색 (핵심)</h2>
+    <div class="badge" style="background:#2a1e3a;color:#a78bfa">핵심 알고리즘 · 1회 실행</div>
+    <p>이 단계가 정밀 최적화의 <b>핵심</b>입니다. 1년을 <b>마지막 날(12/31)부터 첫날(1/1)까지 거꾸로</b> 탐색합니다.</p>
+    <p>왜 거꾸로 갈까요? 생각해보면, 12월 31일의 최선의 선택은 그 날 하루만 보면 됩니다. 12월 30일은 "오늘 + 내일(이미 답을 알고 있음)"을 보면 됩니다. 이렇게 거슬러 올라가면 1월 1일에 도달했을 때 <b>1년 전체를 고려한 최적의 운전 계획</b>이 완성됩니다.</p>
+    <p>기본 최적화는 1월 1일부터 순서대로 하루씩 결정합니다. 그래서 "오늘은 좋은 선택이었지만 내일 보니 나쁜 결과"가 될 수 있습니다. 정밀 최적화는 미래를 먼저 계산하기 때문에 이런 문제가 없습니다.</p>
+    <h3>탐색 규모</h3>
+    <p>매일 모든 상태 × 모든 조합을 비교합니다. 탐색 규모는 1단계에서 정의한 상태 수에 따라 결정되며, 단순 사칙연산이라 1~2초면 끝납니다. (상세 규모는 "상태공간 정의" 노드 참조)</p>
+    <div class="note">이 방식을 <b>동적 프로그래밍(Dynamic Programming)</b>이라고 합니다. "큰 문제를 작은 문제로 나누어 풀고, 이미 푼 결과를 재활용한다"는 수학적 기법입니다.</div>
+
+    <div class="dia" style="padding:28px">
+        <div class="dia-row" style="gap:6px;margin-bottom:16px">
+            <div class="dia-box" style="background:#1e3a2a;color:#4ade80;padding:12px 14px;font-size:13px;border-radius:8px">1일</div>
+            <div class="dia-arrow" style="font-size:20px">←</div>
+            <div class="dia-box" style="background:#1e1e38;color:#a0a0c0;padding:12px 14px;font-size:13px;border-radius:8px">2일</div>
+            <div class="dia-arrow" style="font-size:20px">←</div>
+            <div class="dia-box" style="background:#1e1e38;color:#a0a0c0;padding:12px 14px;font-size:13px;border-radius:8px">3일</div>
+            <div class="dia-arrow" style="font-size:20px">←</div>
+            <div style="color:#4a4a6a;font-size:18px;padding:0 4px">· · ·</div>
+            <div class="dia-arrow" style="font-size:20px">←</div>
+            <div class="dia-box" style="background:#1e1e38;color:#a0a0c0;padding:12px 14px;font-size:13px;border-radius:8px">364일</div>
+            <div class="dia-arrow" style="font-size:20px">←</div>
+            <div class="dia-box" style="background:#2a1e3a;color:#c4b5fd;padding:12px 14px;font-size:13px;border-radius:8px;border:1.5px solid #8b5cf6">365일</div>
+        </div>
+        <div style="text-align:center;font-size:13px;color:#9090aa;margin-bottom:20px">← 마지막 날부터 첫날까지 거꾸로 탐색</div>
+        <div class="dia-bracket" style="max-width:500px;margin:0 auto;padding:20px;text-align:center">
+            <div style="font-size:14px;color:#a78bfa;font-weight:700;margin-bottom:12px">매일, 각 상태에서 모든 조합 비교</div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
+                <div style="padding:8px 14px;background:rgba(139,92,246,0.15);border-radius:6px;font-size:13px;color:#c4b5fd">20%</div>
+                <div style="padding:8px 14px;background:rgba(139,92,246,0.15);border-radius:6px;font-size:13px;color:#c4b5fd">30%</div>
+                <div style="padding:8px 14px;background:rgba(139,92,246,0.15);border-radius:6px;font-size:13px;color:#c4b5fd">40%</div>
+                <div style="padding:8px 14px;background:rgba(139,92,246,0.15);border-radius:6px;font-size:13px;color:#c4b5fd">···</div>
+                <div style="padding:8px 14px;background:rgba(139,92,246,0.25);border-radius:6px;font-size:13px;color:#e0d5ff;border:1.5px solid #8b5cf6">100%</div>
+            </div>
+            <div style="font-size:12px;color:#8888aa">× 가동시간 (0h, 4h, 5h, ..., 24h)</div>
+            <div style="font-size:12px;color:#8888aa;margin-top:4px">→ <b style="color:#c4b5fd">오늘 비용 + 미래 비용</b>이 가장 작은 조합 기록</div>
+        </div>
+    </div>
+    <div class="ref">app.js [L2812~2882]</div>
+</div>
+
+<div class="dp" id="dp_b_forward">
+    <h2>3단계: 순방향 실행</h2>
+    <div class="badge" style="background:#1e3a2a;color:#4ade80">실행 · 365일 반복</div>
+    <p>2단계에서 "모든 상태에서의 최적 결정"이 기록되었습니다. 이제 1월 1일부터 순서대로 따라가면서 <b>실제 운전 스케줄</b>을 만듭니다.</p>
+    <p>매일 다음을 수행합니다:</p>
+    <p>① 2단계에서 기록된 최적 결정(가동시간, 부하) 꺼내기<br>
+    ② CHP를 하루 중 <b>전기가격이 높은 시간대</b>에 배치 (Stage 2)<br>
+    ③ CHP만으로 부족하면 <b>보조보일러(PLB) 투입</b> 판단 (Stage 3)<br>
+    ④ 24시간을 1시간씩 <b>실제 시뮬레이션</b>하여 축열조 변화 확인 (Stage 4)<br>
+    ⑤ 연료비, 전기판매, 기동비 등 <b>비용 집계</b></p>
+    <p>축열조 최종 잔량은 다음날로 전달되어, 365일이 이어집니다.</p>
+
+    <div class="dia" style="padding:28px">
+        <div class="dia-row" style="gap:6px;margin-bottom:16px">
+            <div class="dia-box" style="background:#1e3a2a;color:#4ade80;padding:12px 14px;font-size:13px;border-radius:8px;border:1.5px solid #22c55e">1일</div>
+            <div class="dia-arrow" style="font-size:20px">→</div>
+            <div class="dia-box" style="background:#1e1e38;color:#a0a0c0;padding:12px 14px;font-size:13px;border-radius:8px">2일</div>
+            <div class="dia-arrow" style="font-size:20px">→</div>
+            <div class="dia-box" style="background:#1e1e38;color:#a0a0c0;padding:12px 14px;font-size:13px;border-radius:8px">3일</div>
+            <div class="dia-arrow" style="font-size:20px">→</div>
+            <div style="color:#4a4a6a;font-size:18px;padding:0 4px">· · ·</div>
+            <div class="dia-arrow" style="font-size:20px">→</div>
+            <div class="dia-box" style="background:#1e1e38;color:#a0a0c0;padding:12px 14px;font-size:13px;border-radius:8px">364일</div>
+            <div class="dia-arrow" style="font-size:20px">→</div>
+            <div class="dia-box" style="background:#2a1e3a;color:#c4b5fd;padding:12px 14px;font-size:13px;border-radius:8px">365일</div>
+        </div>
+        <div style="text-align:center;font-size:13px;color:#9090aa;margin-bottom:20px">→ 첫날부터 마지막 날까지 순서대로 실행</div>
+        <div class="dia-bracket" style="max-width:600px;margin:0 auto;padding:20px;text-align:center">
+            <div style="font-size:14px;color:#4ade80;font-weight:700;margin-bottom:14px">매일 수행하는 작업</div>
+            <div style="display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap">
+                <div class="dia-box" style="background:#1e2a4a;color:#60a5fa;padding:12px 16px;font-size:13px;border-radius:8px">결정 추출</div>
+                <div class="dia-arrow" style="font-size:20px">→</div>
+                <div class="dia-box" style="background:#1e2a4a;color:#60a5fa;padding:12px 16px;font-size:13px;border-radius:8px">블록 배치<br><span style="font-size:10px;color:#8888aa">Stage 2</span></div>
+                <div class="dia-arrow" style="font-size:20px">→</div>
+                <div class="dia-box" style="background:#2a1e3a;color:#a78bfa;padding:12px 16px;font-size:13px;border-radius:8px">PLB 판단<br><span style="font-size:10px;color:#8888aa">Stage 3</span></div>
+                <div class="dia-arrow" style="font-size:20px">→</div>
+                <div class="dia-box" style="background:#1e3a2a;color:#4ade80;padding:12px 16px;font-size:13px;border-radius:8px">24h 시뮬<br><span style="font-size:10px;color:#8888aa">Stage 4</span></div>
+                <div class="dia-arrow" style="font-size:20px">→</div>
+                <div class="dia-box" style="background:#3a2a1e;color:#fbbf24;padding:12px 16px;font-size:13px;border-radius:8px">비용 집계</div>
+            </div>
+            <div style="font-size:12px;color:#7070a0;margin-top:12px">축열조 잔량을 다음날로 전달하며 365일 반복</div>
+        </div>
+    </div>
+    <div class="ref">app.js [L2886~3040]</div>
+</div>
+
+<!-- 세부 노드 설명 -->
+<div class="dp" id="dp_n_data">
+    <h2>365일 데이터 로드</h2>
+    <div class="badge" style="background:#1e2a4a;color:#60a5fa">처리</div>
+    <p>시뮬레이션에 필요한 1년치 데이터를 모두 모읍니다. 각 날에 대해 다음 정보가 준비됩니다:</p>
+    <p>• <b>시간별 열수요</b> — 건물이 매 시간 소비하는 열량 (24시간 패턴)<br>
+    • <b>외부수열량</b> — 소각장, ERG 등에서 무상/유상으로 받는 열<br>
+    • <b>시간별 전력가격</b> — CHP가 생산한 전기를 한전에 팔 때의 가격<br>
+    • <b>NG(천연가스) 단가</b> — CHP와 PLB의 연료비<br>
     • 공휴일/주말/정비일 구분</p>
-    <div class="ref">[L2726~2808] solveDP 시작부</div>
+    <div class="ref">app.js [L2730~2757]</div>
 </div>
 
-<div class="dp" id="dp_dp_state">
-    <h2>상태공간 정의</h2>
-    <div class="badge" style="background:#1e2a4a;color:#60a5fa">초기화</div>
-    <p>정밀 최적화는 <b>"축열조에 열이 얼마나 남아있고, CHP가 얼마나 쉬었는가"</b>라는 두 가지 상태를 추적합니다. 이 두 가지 조합이 "현재 상황"을 정의하고, 각 상황에서 최선의 결정을 찾습니다.</p>
-    <p><b>축열조 상태</b>는 100~1500 Gcal 범위를 10 Gcal 단위로 나누어 141개 구간으로 관리합니다. <b>정지레벨</b>은 CHP가 얼마나 오래 쉬었는지를 4단계로 구분합니다 — 가동중(ON), 단기정지(Hot), 중기정지(Warm), 장기정지(Cold).</p>
-    <div class="fm">축열조: 141개 상태 (100~1500 Gcal, 10 단위)<br>정지레벨: 4단계 (ON / Hot / Warm / Cold)<br>총 상태: 141 × 4 = <b>564개</b></div>
-    <p>정지레벨이 중요한 이유는 <b>기동비용</b> 때문입니다. 오래 쉴수록 재기동 비용이 커지므로, 불필요한 정지를 피하는 것이 경제적입니다.</p>
-    <div class="ref">[L2764~2773]</div>
+<div class="dp" id="dp_n_state">
+    <h2>상태공간 정의 (어떤 상황들을 비교할지)</h2>
+    <div class="badge" style="background:#1e2a4a;color:#60a5fa">처리</div>
+    <p>최적화가 비교해야 할 <b>"현재 상황"이 몇 가지나 있는지</b>를 정하는 단계입니다.</p>
+    <p>같은 1월 15일이라도 "축열조에 열이 많이 남아있는 상황"과 "거의 바닥인 상황"은 전혀 다른 결정이 필요합니다. 또한 "어제 CHP를 돌린 상황"과 "3일째 쉬고 있는 상황"도 다릅니다 (재기동 비용이 다르니까). 이런 모든 경우를 빠짐없이 비교하기 위해 범위를 나누는 겁니다.</p>
+    <p><b>축열조</b>는 최소잔량~최대용량 범위를 10Gcal 단위로 나누어 구간으로 관리합니다.</p>
+    <p><b>정지레벨</b>은 CHP가 쉰 기간에 따라 4단계로 나뉩니다:</p>
+    <div class="fm">ON — 현재 가동 중<br>Hot — 1일 이내 정지 (재기동 비용 낮음)<br>Warm — 2일 이내 정지 (재기동 비용 중간)<br>Cold — 3일 이상 정지 (재기동 비용 높음)</div>
+    <p>정지레벨이 중요한 이유는 <b>기동비용</b> 때문입니다. 오래 쉴수록 보일러를 다시 데우는 데 더 많은 가스가 필요합니다.</p>
+    <h3>탐색 규모</h3>
+    <p>이렇게 정의된 상태공간의 크기가 곧 시뮬레이터가 비교해야 할 양을 결정합니다.</p>
+    <div class="fm"><b>① 상태 수 (현재 상황이 몇 가지인가)</b><br>  축열조 구간 수 × 정지레벨 4단계<br>  예) 최대 850, 최소 100 → (850−100)/10+1 = 76구간<br>  → 76 × 4 = <b>304가지 상태</b><br><br><b>② 조합 수 (각 상태에서 시도할 선택지)</b><br>  부하 9가지 (20%, 30%, ..., 100%)<br>  × 가동시간 21가지 (0시간, 4시간, 5시간, ..., 24시간)<br>  = <b>189가지 조합</b><br><br><b>③ 탐색량 (총 비교 횟수)</b><br>  하루 = 304가지 상태 × 189가지 조합 = <b>약 5.7만 번</b><br>  연간 = 5.7만 × 365일 = <b>약 2,100만 번</b></div>
+    <p>숫자가 커 보이지만 단순한 더하기/빼기 연산이라 컴퓨터는 1~2초면 끝냅니다.</p>
+    <div class="ref">app.js [L2764~2773]</div>
 </div>
 
-<div class="dp" id="dp_dp_cost">
+<div class="dp" id="dp_n_cost">
     <h2>일별 비용 사전계산</h2>
-    <div class="badge" style="background:#3a2a1e;color:#fbbf24">계산</div>
-    <p>본격적인 최적화에 앞서, 365일 각각에 대해 <b>"CHP를 이 부하로 1시간 돌리면 얼마가 드는가"</b>를 미리 계산해둡니다. 이렇게 해야 DP 탐색 중에 매번 다시 계산하지 않아도 됩니다.</p>
-    <p>각 부하(20%~100%)에 대해 시간당 순비용을 구합니다. 순비용이란 연료비에서 전기 판매 수익을 뺀 값입니다. 음수면 CHP가 이익이라는 뜻입니다.</p>
-    <div class="fm">netCostH = 가스비/h − 전기매출/h<br><br>음수 → CHP 가동 시 이익 (전기 수익 > 연료비)<br>양수 → CHP 가동 시 비용 발생</div>
-    <p>PLB 단가(원/Gcal)도 함께 계산하여, CHP와 PLB 중 어느 쪽이 경제적인지 비교할 수 있게 합니다.</p>
-    <div class="ref">[L2785~2795]</div>
+    <div class="badge" style="background:#3a2a1e;color:#fbbf24">비교</div>
+    <p>CHP를 돌리면 두 가지가 동시에 일어납니다. <b>가스를 태워서 돈이 나가고</b>(연료비), <b>전기가 만들어져서 돈이 들어옵니다</b>(전기 판매). 이 둘의 차이가 "CHP를 1시간 돌리는 실제 비용"입니다.</p>
+    <p>그런데 이 값은 날마다 다릅니다. 가스값은 월마다 바뀌고, 전기가격은 매일 달라지며, CHP 출력(부하)에 따라서도 가스 소모량과 발전량이 다릅니다.</p>
+    <p>그래서 본격적인 탐색에 앞서, 365일 각각에 대해 <b>9가지 부하(20%~100%)</b>로 CHP를 1시간 돌렸을 때의 비용을 미리 계산해서 표로 만들어둡니다.</p>
+    <p>여기서 <b>"9개 부하"</b>란 CHP의 출력 설정입니다. 설정 > CHP 사양 성능표에 있는 20%, 30%, 40%, ..., 100% 각각에 대해 가스 소모량과 발전량이 다르기 때문에 비용도 달라집니다.</p>
+    <p>또한 여기서 계산하는 비용은 특정 시간(오전 9시 등)의 비용이 아니라, 그 날의 <b>평균 전기가격</b>을 기준으로 한 대표값입니다. 실제 시간대별 가격 차이(낮에 비싸고 밤에 싸고)는 3단계의 블록 배치(Stage 2)에서 반영됩니다.</p>
+    <h3>계산 공식</h3>
+    <div class="fm">시간당 순비용 = 가스비/시간 − 전기매출/시간<br><br>음수 → CHP를 돌릴수록 이익 (전기 수익 > 연료비)<br>양수 → CHP를 돌리면 비용 발생</div>
+    <h3>예시</h3>
+    <div class="fm">1월 1일, 100% 부하:<br>  가스비 = 50만원/h, 전기매출 = 80만원/h → 순비용 = <b>−30만원/h</b> (이익)<br><br>7월 15일, 100% 부하:<br>  가스비 = 48만원/h, 전기매출 = 30만원/h → 순비용 = <b>+18만원/h</b> (비용)</div>
+    <p>이 표가 있으면 2단계에서 "1월 1일에 100%로 15시간 돌리면?" → −30만 × 15 = −450만원(이익)이라고 바로 꺼내 쓸 수 있습니다.</p>
+    <p>PLB(보조보일러)의 열 1Gcal당 생산 단가도 함께 계산합니다. CHP와 PLB 중 어느 쪽이 더 경제적인지 비교하는 데 사용됩니다.</p>
+    <div class="ref">app.js [L2785~2795]</div>
 </div>
 
-<div class="dp" id="dp_dp_backward">
-    <h2>역방향 DP (핵심 알고리즘)</h2>
-    <div class="badge" style="background:#2a1e3a;color:#a78bfa">핵심</div>
-    <p>여기가 정밀 최적화의 <b>핵심</b>입니다. 365일을 <b>마지막 날부터 첫째 날까지 거꾸로</b> 탐색합니다.</p>
-    <p>왜 거꾸로 갈까요? 12월 31일의 최적 결정은 그 날 하루만 보면 됩니다. 12월 30일의 최적 결정은 "오늘 + 내일(이미 계산됨)"을 함께 봅니다. 이렇게 하면 1월 1일에 도달했을 때 <b>1년 전체를 고려한 최적 결정</b>이 완성됩니다.</p>
-    <p>기본 최적화(휴리스틱)는 1월 1일부터 순서대로 결정하므로 미래를 모릅니다. 정밀 최적화는 미래를 먼저 계산하기 때문에 <b>전역 최적해</b>를 찾을 수 있습니다.</p>
-    <div class="fm">각 날, 각 상태에서:<br>"오늘 비용 + 내일부터 끝까지 최소 비용"이 가장 작은 결정을 선택</div>
-    <div class="note">이것이 Dynamic Programming(동적 프로그래밍)의 원리입니다. "큰 문제를 작은 문제로 나누어 풀고, 결과를 재사용한다"는 아이디어입니다.</div>
-    <div class="ref">[L2812~2882]</div>
+<div class="dp" id="dp_n_loop">
+    <h2>모든 조합 시도</h2>
+    <div class="badge" style="background:#3a2a1e;color:#fbbf24">비교</div>
+    <p>각 날마다, 1단계에서 정의한 모든 상태(축열조 잔량 구간 × 정지레벨 조합) 각각에서 가능한 모든 <b>"부하 × 가동시간"</b> 조합을 시도합니다.</p>
+    <p>예를 들어 "축열조 500Gcal, 정지 2일차" 상태에서 "80% 부하로 12시간"과 "100% 부하로 8시간" 중 어느 쪽이 더 비용이 적은지를 비교합니다.</p>
+    <p>각 조합마다 다음을 계산합니다:</p>
+    <p>① CHP 연료비 − 전기매출<br>
+    ② 기동비용 (쉬다 켜면 추가)<br>
+    ③ 축열조가 넘치거나 부족한지<br>
+    ④ PLB가 필요한지<br>
+    ⑤ 이 결정이 <b>내일 이후에 미치는 영향</b> (미래 비용)</p>
+    <p>이 모든 것을 합산하여 총비용이 가장 작은 조합을 선택합니다.</p>
 </div>
 
-<div class="dp" id="dp_dp_loop">
-    <h2>상태별 조합 탐색</h2>
-    <div class="badge" style="background:#3a2a1e;color:#fbbf24">반복</div>
-    <p>각 날에 대해 564개 상태를 순회하면서, 각 상태에서 가능한 모든 <b>"부하 × 가동시간" 조합</b>을 시도합니다.</p>
-    <p>예를 들어 "축열조 500Gcal, 정지 2일차" 상태에서 "80% 부하로 12시간 가동"하면 비용이 얼마인지, "100% 부하로 8시간"이면 얼마인지를 모두 비교합니다.</p>
-    <p>각 조합마다 CHP 비용, 기동비, 축열조 변화, PLB 필요 여부, overflow 검사를 수행하고, 그 중 <b>총비용이 가장 낮은 조합</b>을 해당 상태의 최적 결정으로 기록합니다.</p>
-</div>
-
-<div class="dp" id="dp_dp_chpcost">
+<div class="dp" id="dp_n_chpcost">
     <h2>CHP 비용 계산</h2>
-    <div class="badge" style="background:#1e3a2a;color:#4ade80">계산</div>
-    <p>특정 부하로 특정 시간만큼 CHP를 가동했을 때의 <b>열생산량과 비용</b>을 계산합니다.</p>
-    <div class="fm">열생산 = 가동시간 × 시간당 열출력<br>비용 = 가동시간 × 시간당 순비용</div>
-    <p>시간당 순비용이 음수면 가동할수록 이익이 생기므로, CHP를 오래 돌리는 쪽으로 결정됩니다.</p>
+    <div class="badge" style="background:#1e3a2a;color:#4ade80">액션</div>
+    <p>특정 부하로 특정 시간만큼 CHP를 가동했을 때의 열생산량과 비용을 구합니다.</p>
+    <div class="fm">열생산량 = 가동시간 × 시간당 열출력<br>비용 = 가동시간 × 시간당 순비용</div>
+    <p>시간당 순비용이 음수(전기 수익 > 연료비)이면 CHP를 오래 돌릴수록 이익입니다. 양수이면 꼭 필요한 만큼만 돌리는 게 경제적입니다.</p>
 </div>
 
-<div class="dp" id="dp_dp_startup">
+<div class="dp" id="dp_n_startup">
     <h2>기동비용 판단</h2>
-    <div class="badge" style="background:#2a1e3a;color:#a78bfa">조건</div>
-    <p>CHP가 쉬고 있다가 다시 켜면 <b>기동비용</b>이 발생합니다. 쉰 기간이 길수록 비용이 커집니다.</p>
-    <p>이 비용이 DP에 반영되기 때문에, 짧은 기간 끄고 다시 켜는 것보다 <b>최소부하로 계속 가동하는 게 싸다</b>는 판단이 자동으로 이루어집니다.</p>
-    <div class="fm">Hot Start (1일 이내 정지): 기동시간 4h × 가스 300 Nm³/h<br>Warm Start (2일 이내): 기동시간 6h × 가스 350 Nm³/h<br>Cold Start (3일 이상): 기동시간 8h × 가스 400 Nm³/h</div>
-    <div class="ref">[L2840~2842]</div>
+    <div class="badge" style="background:#2a1e3a;color:#a78bfa">판단</div>
+    <p>CHP가 쉬고 있다가 다시 켜면 보일러를 데우는 데 가스가 소모됩니다. 이것이 <b>기동비용</b>입니다. 쉰 기간이 길수록 더 많이 듭니다.</p>
+    <div class="fm">Hot (1일 이내 정지): 4시간 × 300 Nm³/시간 × NG단가<br>Warm (2일 이내 정지): 6시간 × 350 Nm³/시간 × NG단가<br>Cold (3일 이상 정지): 8시간 × 400 Nm³/시간 × NG단가</div>
+    <p>이 비용이 총비용에 포함되므로, 알고리즘은 자연스럽게 <b>"짧게 끄고 다시 켜느니 최소 출력으로 유지하는 게 낫다"</b>는 판단을 합니다.</p>
+    <div class="ref">app.js [L2840~2842]</div>
 </div>
 
-<div class="dp" id="dp_dp_storage">
+<div class="dp" id="dp_n_storage">
     <h2>축열조 변화 계산</h2>
-    <div class="badge" style="background:#1e3a2a;color:#4ade80">계산</div>
-    <p>CHP를 특정 시간/부하로 가동한 후 <b>축열조 잔량이 어떻게 변하는지</b>를 계산합니다.</p>
+    <div class="badge" style="background:#1e3a2a;color:#4ade80">액션</div>
+    <p>CHP를 특정 시간 가동한 후 축열조에 열이 얼마나 남는지를 계산합니다.</p>
     <div class="fm">새 잔량 = 현재 잔량 + CHP 열생산 − 하루 열수요</div>
-    <p>이 값에 따라 다음날의 시작 상태가 결정되고, 미래 비용에 영향을 미칩니다. 축열조에 열을 많이 남기면 다음날 CHP를 덜 돌려도 되지만, 너무 많이 남기면 overflow가 됩니다.</p>
-    <div class="ref">[L2849]</div>
+    <p>이 값에 따라 내일의 시작 상태가 결정됩니다. 오늘 열을 많이 남기면 내일 CHP를 덜 돌려도 되지만, 너무 많이 남기면 축열조가 넘칩니다.</p>
+    <div class="ref">app.js [L2849]</div>
 </div>
 
-<div class="dp" id="dp_dp_plb">
-    <h2>PLB 강제 투입</h2>
-    <div class="badge" style="background:#2a1e3a;color:#a78bfa">조건</div>
-    <p>CHP 열생산만으로 축열조 잔량이 <b>최소 수준(storageMin) 아래</b>로 내려가면, PLB(보조보일러)를 강제로 투입합니다. 열 공급이 부족하면 건물에 난방이 안 되기 때문입니다.</p>
-    <p>PLB 비용도 해당 조합의 총비용에 합산되므로, DP는 자연스럽게 <b>PLB 투입이 적은 조합을 선호</b>합니다.</p>
-    <div class="rule">R1: 축열조 잔량은 어떤 시간에도 최소 수준 아래로 내려가면 안 된다</div>
-    <div class="ref">[L2853~2859]</div>
+<div class="dp" id="dp_n_plb_dp">
+    <h2>축열조 부족 → PLB 투입</h2>
+    <div class="badge" style="background:#2a1e3a;color:#a78bfa">판단</div>
+    <p>CHP 열생산만으로 축열조가 <b>최소 수준 아래</b>로 떨어지면 열 공급이 부족해집니다. 이때 PLB(보조보일러)를 강제로 투입하여 부족분을 보충합니다.</p>
+    <p>PLB 비용도 총비용에 합산되므로, 알고리즘은 <b>PLB 투입이 적은 조합을 자연스럽게 선호</b>합니다.</p>
+    <div class="rule">절대 규칙 R1: 축열조 잔량은 어떤 시간에도 최소 수준 아래로 내려가면 안 됩니다</div>
+    <div class="ref">app.js [L2853~2859]</div>
 </div>
 
-<div class="dp" id="dp_dp_overflow">
-    <h2>Overflow 검사</h2>
-    <div class="badge" style="background:#2a1e3a;color:#a78bfa">조건</div>
-    <p>CHP 열생산으로 축열조가 <b>상한(storageCap)을 초과</b>하면, 남는 열을 버려야 합니다. 이건 에너지 낭비이므로 절대 허용하지 않습니다.</p>
-    <p>CHP가 가동 중(h > 0)인데 overflow가 발생하는 조합은 <b>아예 후보에서 제외</b>합니다. 이것이 DP에서 열 버림을 원천 차단하는 방식입니다.</p>
-    <div class="rule">R2: 축열조 잔량은 상한을 초과할 수 없다 — 열 버림 금지</div>
-    <div class="ref">[L2863~2866]</div>
+<div class="dp" id="dp_n_overflow">
+    <h2>축열조 넘침 → 조합 제외</h2>
+    <div class="badge" style="background:#2a1e3a;color:#a78bfa">판단</div>
+    <p>CHP 열생산으로 축열조가 <b>상한을 초과</b>하면 남는 열을 버려야 합니다. 이건 에너지 낭비이므로, CHP를 가동하는 조합인데 축열조가 넘치면 <b>그 조합은 아예 후보에서 탈락</b>시킵니다.</p>
+    <p>이것이 열 버림을 원천 차단하는 방식입니다.</p>
+    <div class="rule">절대 규칙 R2: 축열조 잔량은 상한을 초과할 수 없습니다 — 열 버림 금지</div>
+    <div class="ref">app.js [L2863~2866]</div>
 </div>
 
-<div class="dp" id="dp_dp_best">
-    <h2>최소 비용 갱신</h2>
-    <div class="badge" style="background:#1e3a2a;color:#4ade80">결정</div>
-    <p>모든 조합을 시도한 후, <b>"오늘 비용 + 내일부터 끝까지 비용"이 가장 작은 조합</b>을 해당 상태의 최적 결정으로 기록합니다.</p>
-    <div class="fm">총비용 = CHP비용 + 기동비 + PLB비용 + 미래최소비용<br><br>이 값이 지금까지의 최저보다 작으면 갱신</div>
-    <p>"미래최소비용"은 이미 계산이 끝난 값(다음날의 DP 결과)이므로, 현재 결정이 미래에 미치는 영향까지 고려한 <b>전역 최적</b>이 됩니다.</p>
-    <div class="ref">[L2869~2874]</div>
+<div class="dp" id="dp_n_best">
+    <h2>최소 비용 결정 기록</h2>
+    <div class="badge" style="background:#1e3a2a;color:#4ade80">액션</div>
+    <p>모든 조합을 비교한 후, <b>"오늘 비용 + 내일부터 연말까지 비용"이 가장 작은 조합</b>을 해당 상태의 최적 결정으로 기록합니다.</p>
+    <div class="fm">총비용 = CHP 비용 + 기동비 + PLB 비용 + 미래 최소비용<br><br>→ 이 값이 가장 작은 (부하, 가동시간) 조합을 기록</div>
+    <p>"미래 최소비용"은 다음날의 탐색 결과(이미 계산 완료)입니다. 이렇게 오늘 결정이 미래에 미치는 영향까지 고려하기 때문에, 단순한 일별 판단보다 정확합니다.</p>
+    <div class="ref">app.js [L2869~2874]</div>
 </div>
 
-<div class="dp" id="dp_dp_forward">
-    <h2>순방향 복원</h2>
-    <div class="badge" style="background:#1e2a4a;color:#60a5fa">실행</div>
-    <p>역방향 DP에서 <b>모든 상태의 최적 결정이 기록</b>되었습니다. 이제 1월 1일부터 순서대로 따라가면서 실제 스케줄을 만듭니다.</p>
-    <p>축열조 초기값에서 출발하여 매일: DP가 기록한 최적 결정(가동시간, 부하)을 꺼내고 → CHP 블록을 배치하고 → PLB 필요 여부를 확인하고 → 24시간 시뮬레이션을 실행합니다.</p>
-    <p>Stage 2(블록 배치), Stage 3(PLB 투입), Stage 4(시간별 시뮬)는 기본 최적화와 <b>동일한 로직</b>을 사용합니다. DP가 결정하는 것은 "몇 시간, 어떤 부하"뿐이고, 나머지는 공유합니다.</p>
-    <div class="ref">[L2886~3020]</div>
+<div class="dp" id="dp_n_extract">
+    <h2>최적 결정 추출</h2>
+    <div class="badge" style="background:#1e2a4a;color:#60a5fa">처리</div>
+    <p>2단계에서 모든 상태의 최적 결정이 기록되었습니다. 이제 축열조 초기값에서 출발하여 <b>1월 1일부터 순서대로</b> 기록된 결정을 꺼냅니다.</p>
+    <p>매일 결정을 적용하면 축열조 잔량이 변하고, 정지레벨도 변합니다. 그 변한 상태에서 다음날의 결정을 꺼내는 식으로 365일을 이어갑니다.</p>
+    <div class="ref">app.js [L2886~2920]</div>
 </div>
 
-<div class="dp" id="dp_stage2">
-    <h2>Stage 2: 블록 배치</h2>
-    <div class="badge" style="background:#1e2a4a;color:#60a5fa">배치</div>
-    <p>DP가 "오늘 15시간 가동"이라고 결정했다면, <b>하루 중 어느 시간대에 배치할지</b>를 이 단계에서 결정합니다.</p>
-    <p>모든 가능한 시작시간을 시뮬레이션하고, 전기 시장가격(MP)이 높은 시간대에 CHP가 돌아가도록 배치합니다. 단, <b>축열조가 넘치는 배치는 무조건 거부</b>합니다.</p>
-    <p>모든 배치에서 overflow가 발생하면 CHP 시간을 1시간씩 줄여가며 재시도합니다. 그래도 안 되면 해당 일은 CHP를 가동하지 않습니다.</p>
-    <div class="rule">R2: overflow가 발생하는 배치는 완전 거부</div>
-    <div class="ref">[L2923~2960]</div>
+<div class="dp" id="dp_n_block">
+    <h2>CHP 블록 배치 (Stage 2)</h2>
+    <div class="badge" style="background:#1e2a4a;color:#60a5fa">처리</div>
+    <p>"오늘 15시간 가동"이라고 결정되었다면, <b>하루 24시간 중 어느 시간대에 CHP를 돌릴지</b>를 이 단계에서 정합니다.</p>
+    <p>모든 가능한 시작시간(0시, 1시, ..., 9시)을 시뮬레이션하고, <b>전기 시장가격이 높은 시간대</b>에 배치합니다. 전기를 비싸게 팔 수 있는 시간에 CHP를 돌려야 매출이 극대화됩니다.</p>
+    <p>단, 축열조가 넘치는 배치는 <b>무조건 거부</b>합니다. 모든 배치에서 넘치면 CHP 시간을 1시간씩 줄여서 재시도합니다.</p>
+    <div class="rule">절대 규칙 R2: 축열조가 넘치는 배치는 완전 거부</div>
+    <div class="ref">app.js [L2923~2960]</div>
 </div>
 
-<div class="dp" id="dp_stage3">
-    <h2>Stage 3: PLB 투입 판단</h2>
+<div class="dp" id="dp_n_plb">
+    <h2>PLB 투입 판단 (Stage 3)</h2>
     <div class="badge" style="background:#2a1e3a;color:#a78bfa">판단</div>
     <p>CHP 배치가 확정된 후, <b>CHP + 외부수열 + 축열조만으로 하루를 버틸 수 있는지</b> 24시간 시뮬레이션으로 검증합니다.</p>
-    <p>어느 시간이든 축열조가 최소 수준 아래로 떨어지면 PLB를 투입합니다. 부족분(deficit) 기반으로 필요한 만큼만 투입하되, 과투입을 방지합니다.</p>
-    <div class="ref">[L2962~2999]</div>
+    <p>어느 시간이든 축열조가 최소 수준 아래로 떨어지면 PLB(보조보일러)를 투입합니다.</p>
+    <h3>과투입 방지</h3>
+    <p>PLB는 부족분의 <b>2배를 초과하지 않는 범위</b>에서 투입합니다. 또한 PLB를 <b>부족이 발생하는 시점 직전</b>에 배치하여 효과를 극대화합니다.</p>
+    <div class="ref">app.js [L2962~2999]</div>
 </div>
 
-<div class="dp" id="dp_plb">
-    <h2>PLB 투입 상세</h2>
+<div class="dp" id="dp_n_sim">
+    <h2>24시간 시뮬레이션 (Stage 4)</h2>
+    <div class="badge" style="background:#1e2a4a;color:#60a5fa">처리</div>
+    <p>모든 결정이 끝나면 <b>24시간을 1시간씩 실제로 시뮬레이션</b>합니다. 매 시간 축열조에 들어오는 열(CHP, PLB, 외부수열)과 나가는 열(수요)을 계산하여 잔량을 갱신합니다.</p>
+    <p>만약 시뮬 도중 축열조가 상한에 도달하면 <b>CHP 열출력을 실시간으로 줄여서</b> 넘치지 않게 합니다. 열출력을 줄이면 발전량(전기 생산)도 비례해서 줄어듭니다.</p>
+    <div class="rule">절대 규칙 R2: 시간별 시뮬에서도 넘침 완전 방지</div>
+    <div class="ref">app.js [L3002~3020]</div>
+</div>
+
+<div class="dp" id="dp_n_agg">
+    <h2>일별 집계</h2>
     <div class="badge" style="background:#1e3a2a;color:#4ade80">액션</div>
-    <p>PLB는 <b>부족분의 2배를 초과하지 않는 범위</b>에서 투입합니다. 이전에는 PLB 최소운전시간(2시간) 때문에 5Gcal만 부족해도 140Gcal을 투입하는 과투입이 있었지만, 지금은 상한이 걸려 있습니다.</p>
-    <p>또한 PLB 배치 위치가 개선되었습니다. 이전에는 12시 중심으로 고정 배치했지만, 지금은 <b>축열조가 실제로 부족해지는 시점 직전</b>에 배치합니다.</p>
-    <div class="ref">[L2973~2999]</div>
-</div>
-
-<div class="dp" id="dp_stage4">
-    <h2>Stage 4: 시간별 시뮬 & 집계</h2>
-    <div class="badge" style="background:#1e2a4a;color:#60a5fa">실행</div>
-    <p>모든 결정이 끝나면 <b>24시간을 1시간씩 실제로 시뮬레이션</b>합니다. 매 시간 축열조 잔량을 갱신하고, 열수급 균형을 확인합니다.</p>
-    <p>만약 시뮬 도중 축열조가 상한에 도달하면 <b>CHP 열출력을 실시간으로 줄여서</b> 넘치지 않게 합니다. 열출력을 줄이면 발전량(kWh)도 비례해서 줄어듭니다.</p>
-    <p>하루가 끝나면 연료비, 전기판매, 기동비, CHP단가, PLB비용 등을 집계합니다. 축열조 최종 잔량은 다음날로 전달됩니다.</p>
-    <div class="rule">R2: 시간별 시뮬에서도 overflow 완전 방지</div>
-    <div class="ref">[L3002~3040]</div>
+    <p>하루의 시뮬레이션이 끝나면 비용과 수익을 집계합니다:</p>
+    <p>• <b>CHP 연료비</b> — 가동시간 × 시간당 가스비<br>
+    • <b>전력판매</b> — 시간별 (전기가격 × 발전량) 합산<br>
+    • <b>기동비용</b> — 정지 후 재기동 시 발생<br>
+    • <b>PLB 연료비</b> — PLB 가동 시 가스비<br>
+    • <b>CHP단가</b> — (연료비 + 기동비 − 전력판매) / 생산열량</p>
+    <p>축열조 최종 잔량은 다음날로 전달됩니다. 365일이 끝나면 연간 운영비용이 산출됩니다.</p>
+    <div class="ref">app.js [L3022~3040]</div>
 </div>
 
 </div>
@@ -364,10 +420,10 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #1a1a2e; color: #e0e
 <script>
 function sd(id) {
     document.querySelectorAll('.dp').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.pa-node,.dm-box').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.block-head,.node').forEach(n => n.classList.remove('active'));
     const el = document.getElementById('dp_' + id);
     if (el) el.classList.add('active');
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) event.currentTarget.classList.add('active');
 }
 </script>
 </body>
