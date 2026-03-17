@@ -3171,6 +3171,46 @@ function solveMPC(horizon, onProgress) {
     const hourCandidates = [0];
     for (let h = Math.max(1, minRunTime); h <= 24; h++) hourCandidates.push(h);
 
+    // ═══ 사전검증: 각 날/축열조잔량에서 넘치지 않는 최대 CHP 시간 ═══
+    // maxSafeHours[dayIdx][storageStateJ] = 넘침 없는 최대 가동시간
+    function calcMaxSafeHours(di, startStorage, heatPerH) {
+        const d = dayInfo[di];
+        const extH = d.adjExternal / 24;
+        const intH = d.adjIntecoNet / 24;
+        const demH = d.demandH;
+        // 24h부터 내려가며 넘침 없는 시간 찾기
+        for (let tryH = 24; tryH >= 0; tryH--) {
+            if (tryH > 0 && tryH < minRunTime) continue;
+            // 최적 시작시간으로 시뮬 (MP 높은 시간대 우선)
+            let ok = false;
+            if (tryH === 0) { ok = true; }
+            else if (tryH >= 24) {
+                // 24h: 전 시간 가동, 넘침 확인
+                let st = startStorage, overflow = false;
+                for (let h = 0; h < 24; h++) {
+                    st += extH + intH + heatPerH - demH[h];
+                    if (st > storageCap) { overflow = true; break; }
+                    if (st < storageMin) st = storageMin;
+                }
+                ok = !overflow;
+            } else {
+                // 부분 가동: 어떤 시작시간이든 넘치지 않는지
+                for (let s = 0; s <= 24 - tryH; s++) {
+                    let st = startStorage, overflow = false;
+                    for (let h = 0; h < 24; h++) {
+                        const chp = (h >= s && h < s + tryH) ? heatPerH : 0;
+                        st += extH + intH + chp - demH[h];
+                        if (st > storageCap) { overflow = true; break; }
+                        if (st < storageMin) st = storageMin;
+                    }
+                    if (!overflow) { ok = true; break; }
+                }
+            }
+            if (ok) return tryH;
+        }
+        return 0;
+    }
+
     // ═══ MPC 루프: 매일 DP + 1일 실행 ═══
     for (let today = 0; today < N; today++) {
         if (onProgress && today % 5 === 0) onProgress(Math.round(today / N * 100), today + 1);
@@ -3197,7 +3237,10 @@ function solveMPC(horizon, onProgress) {
 
                     for (let li = 0; li < perfOptions.length; li++) {
                         const perf = d.costs[li];
+                        // 시간별 사전검증: 이 축열조 잔량에서 넘치지 않는 최대 시간
+                        const maxH = (wi === 0) ? calcMaxSafeHours(di, s, perf.heatRate) : 24;
                         for (const h of hourCandidates) {
+                            if (h > maxH) continue; // 시간별 검증 통과 못하면 스킵
                             if (h > 0 && d.isMaint) continue;
 
                             const chpHeat = h * perf.heatRate;
