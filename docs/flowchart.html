@@ -106,10 +106,11 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #0f0f1e; color: #e0e
 <div class="block">
     <div class="block-head" onclick="sd('b_backward')">
         <div class="block-num bg-purple">2</div>
-        <div class="block-info"><div class="title">역방향 탐색 (핵심) <span style="font-size:10px;font-weight:600;color:#a78bfa;background:rgba(139,92,246,0.15);padding:2px 6px;border-radius:3px;margin-left:6px">1회 실행</span></div><div class="sub">365일→1일 역순으로 각 상태의 최적 결정 탐색</div></div>
+        <div class="block-info"><div class="title">역방향 탐색 (핵심) <span style="font-size:10px;font-weight:600;color:#a78bfa;background:rgba(139,92,246,0.15);padding:2px 6px;border-radius:3px;margin-left:6px">1회 실행</span></div><div class="sub">시간별 사전검증 → 역순 탐색으로 각 상태의 최적 결정</div></div>
     </div>
     <div class="block-body">
-        <div class="node" onclick="sd('n_loop')"><div class="node-icon bg-amber">C</div><div><div class="title">모든 조합 시도</div><div class="sub">각 상태에서 부하 × 가동시간 조합 비교</div></div></div>
+        <div class="node" onclick="sd('n_presim')"><div class="node-icon bg-green">A</div><div><div class="title">시간별 사전검증</div><div class="sub">각 축열조 잔량에서 넘치지 않는 최대 CHP 시간 산출</div></div></div>
+        <div class="node" onclick="sd('n_loop')"><div class="node-icon bg-amber">C</div><div><div class="title">모든 조합 시도</div><div class="sub">사전검증 통과한 범위 내에서 부하 × 가동시간 비교</div></div></div>
         <div class="node" onclick="sd('n_chpcost')"><div class="node-icon bg-green">A</div><div><div class="title">CHP 비용 계산</div><div class="sub">가동시간 × 시간당 순비용</div></div></div>
         <div class="node" onclick="sd('n_startup')"><div class="node-icon bg-purple">?</div><div><div class="title">기동비용 발생?</div><div class="sub">정지상태 → 가동 시 Hot/Warm/Cold 비용</div></div></div>
         <div class="node" onclick="sd('n_storage')"><div class="node-icon bg-green">A</div><div><div class="title">축열조 변화 계산</div><div class="sub">현재잔량 + CHP열 − 열수요</div></div></div>
@@ -190,7 +191,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #0f0f1e; color: #e0e
         </div>
         <div style="text-align:center;font-size:13px;color:#9090aa;margin-bottom:20px">← 마지막 날부터 첫날까지 거꾸로 탐색</div>
         <div class="dia-bracket" style="max-width:500px;margin:0 auto;padding:20px;text-align:center">
-            <div style="font-size:14px;color:#a78bfa;font-weight:700;margin-bottom:12px">매일, 각 상태에서 모든 조합 비교</div>
+            <div style="font-size:14px;color:#a78bfa;font-weight:700;margin-bottom:12px">매일, 각 상태에서 사전검증 통과 범위 내 조합 비교</div>
             <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
                 <div style="padding:8px 14px;background:rgba(139,92,246,0.15);border-radius:6px;font-size:13px;color:#c4b5fd">20%</div>
                 <div style="padding:8px 14px;background:rgba(139,92,246,0.15);border-radius:6px;font-size:13px;color:#c4b5fd">30%</div>
@@ -295,6 +296,19 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #0f0f1e; color: #e0e
     <p>이 표가 있으면 2단계에서 "1월 1일에 100%로 15시간 돌리면?" → −30만 × 15 = −450만원(이익)이라고 바로 꺼내 쓸 수 있습니다.</p>
     <p>PLB(보조보일러)의 열 1Gcal당 생산 단가도 함께 계산합니다. CHP와 PLB 중 어느 쪽이 더 경제적인지 비교하는 데 사용됩니다.</p>
     <div class="ref">app.js [L2785~2795]</div>
+</div>
+
+<div class="dp" id="dp_n_presim">
+    <h2>시간별 사전검증</h2>
+    <div class="badge" style="background:#1e3a2a;color:#4ade80">검증</div>
+    <p>기존에는 DP가 하루 총량만 보고 "24시간 가동 OK"라고 판단했지만, 실제로는 <b>새벽처럼 수요가 낮은 시간에 축열조가 넘치는</b> 문제가 있었습니다.</p>
+    <p>이를 해결하기 위해, DP가 결정하기 전에 <b>실제 시간별 시뮬레이션을 미리 돌려서</b> 넘치지 않는 최대 CHP 가동시간을 확인합니다.</p>
+    <h3>작동 방식</h3>
+    <p>각 축열조 잔량에서 24시간부터 내려가며 검증합니다:</p>
+    <div class="fm">축열조 800Gcal에서 CHP 80% 부하:<br><br>24h → 시간별 시뮬 → 새벽 2시에 넘침 → 탈락<br>23h → 시간별 시뮬 → 새벽 1시에 넘침 → 탈락<br>...<br>18h → 시간별 시뮬 → 넘침 없음 → <b>최대 18h 허용</b></div>
+    <p>DP는 이 날 이 잔량에서 <b>18시간 이하</b>로만 후보를 탐색합니다. 시간대를 임의로 구분하는 것이 아니라, <b>그 날의 실제 수요·외부수열 패턴</b>을 기반으로 판단합니다.</p>
+    <div class="rule">절대 규칙 R2: 이 검증을 통해 시간별 넘침을 원천 차단합니다</div>
+    <div class="ref">app.js calcMaxSafeHours()</div>
 </div>
 
 <div class="dp" id="dp_n_loop">
