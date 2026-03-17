@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>CHP 보일러 기동계획</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body style="background:#0a0a0a;">
+
+<!-- ═══════════════════════════════════════════════
+     커스텀 타이틀바 (frameless 모드)
+     ═══════════════════════════════════════════════ -->
+<div id="customTitlebar" class="custom-titlebar">
+    <div class="titlebar-drag pywebview-drag-region">
+        <img src="logo/with logo.png" alt="" class="titlebar-logo">
+        <span class="titlebar-text">위드인천에너지 CHP 시뮬레이터</span>
+    </div>
+    <div class="titlebar-controls">
+        <button class="titlebar-btn titlebar-min" onclick="pywebview.api && window.minimize ? window.minimize() : null" id="tbMin">
+            <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="titlebar-btn titlebar-max" id="tbMax">
+            <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+        <button class="titlebar-btn titlebar-close" id="tbClose">
+            <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+        </button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     메인 화면 (프로젝트 선택)
+     ═══════════════════════════════════════════════ -->
+<div class="main-screen" id="mainScreen">
+<div class="main-box">
+    <div class="main-logo-area">
+        <img src="logo/with logo.png" alt="위드인천에너지" class="main-logo-img">
+        <span class="main-logo-text">위드인천에너지</span>
+    </div>
+    <div class="main-title">CHP 보일러 기동계획 시뮬레이터</div>
+    <div class="main-sub">프로젝트를 선택하거나 새로 만드세요</div>
+    <div class="main-actions">
+        <!-- 기존 프로젝트 -->
+        <div class="main-card">
+            <h3>프로젝트 열기</h3>
+            <div class="project-list" id="projectList">
+                <p class="hint">프로젝트가 없습니다</p>
+            </div>
+        </div>
+        <!-- 새 프로젝트 -->
+        <div class="main-card">
+            <h3>새 프로젝트</h3>
+            <label>프로젝트명
+                <input type="text" id="newProjectName" placeholder="예: 24년도위드">
+            </label>
+            <label>기준연도
+                <input type="text" id="newProjectYear" value="2024">
+            </label>
+            <button class="btn-primary" onclick="createProject()">생성</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     앱 화면
+     ═══════════════════════════════════════════════ -->
+<div id="appScreen" style="display:none">
+
+<nav id="tabNav">
+    <span class="nav-title" id="navProjectName">기동계획</span>
+    <button class="tab-btn active" data-tab="tab-data">데이터</button>
+    <button class="tab-btn" data-tab="tab-settings">설정</button>
+    <button class="tab-btn" data-tab="tab-calc">데이터 산출</button>
+    <button class="tab-btn" data-tab="tab-plan">기동계획</button>
+    <button class="tab-btn" data-tab="tab-cost">비용산출</button>
+    <button class="tab-btn" data-tab="tab-result">운영손익</button>
+    <button class="btn-home" onclick="goHome()">홈</button>
+</nav>
+
+<!-- ─── 데이터 탭 ─── -->
+<div class="tab-content active" id="tab-data">
+    <div class="section-bar">
+        <span class="section-title">데이터</span>
+        <span class="section-status" id="dataStatus">0 / 0</span>
+        <button class="btn-sm" onclick="uploadExcel()">Excel 일괄 업로드</button>
+        <button class="btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
+    </div>
+    <p class="tab-guide">Excel 파일로 일괄 업로드하거나, 항목별로 개별 입력할 수 있습니다</p>
+    <div class="data-freq-tabs">
+        <button class="freq-tab active" data-freq="input">입력 데이터</button>
+        <button class="freq-tab" data-freq="pricing">단가/요금</button>
+    </div>
+
+    <!-- 입력 데이터 -->
+    <div class="freq-panel active" id="fp_input">
+        <div class="inner-tabs" id="inputTabs">
+            <button class="inner-tab active" data-key="smp_hourly">SMP(시간별)</button>
+            <button class="inner-tab" data-key="sales_hourly">판매실적(시간별)</button>
+            <button class="inner-tab" data-key="operations_daily">외부거래</button>
+            <button class="inner-tab" data-key="water_chem_daily">용수약품</button>
+            <button class="inner-tab" data-key="holidays">공휴일</button>
+            <button class="inner-tab" data-key="capacity_hourly">전력수급</button>
+        </div>
+        <div class="data-panel active" id="dp_smp_hourly"><div class="pv-body" id="pv_smp_hourly"><p class="hint">SMP 데이터를 업로드하세요</p></div></div>
+        <div class="data-panel" id="dp_operations_daily">
+            <div class="ext-add-bar">
+                <span class="ext-add-label">수열원 추가</span>
+                <input type="text" id="newExtName" placeholder="열원 이름" class="ext-add-input" style="width:120px">
+                <input type="text" id="newExtPriceName" placeholder="단가 컬럼명 (비워두면 동일)" class="ext-add-input" style="width:160px">
+                <select id="newExtType" class="ext-add-input">
+                    <option value="supply">공급</option>
+                    <option value="dual">양방향</option>
+                </select>
+                <button class="btn-sm" onclick="addExtSource()">+ 추가</button>
+                <span class="ext-add-hint">엑셀 서식, 단가탭, 설정, 시뮬레이션에 자동 반영됩니다</span>
+            </div>
+            <div class="pv-body" id="pv_operations_daily"><p class="hint">외부거래 데이터를 업로드하세요</p></div>
+        </div>
+        <div class="data-panel" id="dp_sales_hourly"><div class="pv-body" id="pv_sales_hourly"><p class="hint">판매실적(시간별) 데이터를 업로드하세요</p></div></div>
+        <div class="data-panel" id="dp_sales_daily" style="display:none"><div class="pv-body" id="pv_sales_daily"></div></div>
+        <div class="data-panel" id="dp_water_chem_daily"><div class="pv-body" id="pv_water_chem_daily"><p class="hint">용수약품 사용량 데이터를 업로드하세요</p></div></div>
+        <div class="data-panel" id="dp_holidays"><div class="pv-body" id="pv_holidays"><p class="hint">공휴일 데이터를 업로드하세요</p></div></div>
+        <div class="data-panel" id="dp_capacity_hourly">
+            <div class="elec-data-subtabs">
+                <button class="elec-sub active" data-edkey="capacity_hourly">수전량</button>
+                <button class="elec-sub" data-edkey="heat_constraint_hourly">열제약 송전량</button>
+            </div>
+            <div class="elec-data-pane active" id="edp_capacity_hourly"><div class="pv-body" id="pv_capacity_hourly"><p class="hint">수전량 시간별 데이터를 업로드하세요 (kWh)</p></div></div>
+            <div class="elec-data-pane" id="edp_heat_constraint_hourly"><div class="pv-body" id="pv_heat_constraint_hourly"><p class="hint">열제약 송전량 데이터를 업로드하세요 (kWh, 선택)</p></div></div>
+        </div>
+    </div>
+
+    <!-- 단가/요금 데이터 -->
+    <div class="freq-panel" id="fp_pricing">
+        <div class="inner-tabs" id="pricingTabs">
+            <button class="inner-tab active" data-key="cp_monthly">CP/TLF</button>
+            <button class="inner-tab" data-key="ng_price_monthly">NG단가</button>
+            <button class="inner-tab" data-key="base_charge_monthly">전기요금설정</button>
+            <button class="inner-tab" data-key="elec_rate">전기요금표</button>
+            <button class="inner-tab" data-key="heat_rate_table">열요금표</button>
+            <button class="inner-tab" data-key="water_price_monthly">수도단가</button>
+            <button class="inner-tab" data-key="chem_price_monthly">약품단가</button>
+            <button class="inner-tab" data-key="sale_prices_daily">판매단가</button>
+        </div>
+        <div class="data-panel active" id="dp_cp_monthly"><div class="pv-body" id="pv_cp_monthly"><p class="hint">CP/TLF 데이터를 입력하세요</p></div></div>
+        <div class="data-panel" id="dp_ng_price_monthly"><div class="pv-body" id="pv_ng_price_monthly"><p class="hint">NG단가 데이터를 입력하세요</p></div></div>
+        <div class="data-panel" id="dp_base_charge_monthly"><div class="pv-body" id="pv_base_charge_monthly"><p class="hint">전기요금설정을 입력하세요</p></div></div>
+        <div class="data-panel" id="dp_elec_rate">
+            <div class="inner-tabs" id="elecRateTabs" style="margin-bottom:8px">
+                <button class="inner-tab active" data-ertab="elec_rate_weekday">평일</button>
+                <button class="inner-tab" data-ertab="elec_rate_saturday">토요일</button>
+                <button class="inner-tab" data-ertab="elec_rate_holiday">공휴일</button>
+            </div>
+            <div class="elec-rate-panel active" id="erp_elec_rate_weekday"><div class="pv-body" id="pv_elec_rate_weekday"><p class="hint">평일 전기요금표를 입력하세요</p></div></div>
+            <div class="elec-rate-panel" id="erp_elec_rate_saturday"><div class="pv-body" id="pv_elec_rate_saturday"><p class="hint">토요일 전기요금표를 입력하세요</p></div></div>
+            <div class="elec-rate-panel" id="erp_elec_rate_holiday"><div class="pv-body" id="pv_elec_rate_holiday"><p class="hint">공휴일 전기요금표를 입력하세요</p></div></div>
+        </div>
+        <div class="data-panel" id="dp_heat_rate_table"><div class="pv-body" id="pv_heat_rate_table"><p class="hint">열요금표를 입력하세요</p></div></div>
+        <div class="data-panel" id="dp_water_price_monthly"><div class="pv-body" id="pv_water_price_monthly"><p class="hint">수도단가를 입력하세요</p></div></div>
+        <div class="data-panel" id="dp_chem_price_monthly"><div class="pv-body" id="pv_chem_price_monthly"><p class="hint">약품단가를 입력하세요</p></div></div>
+        <div class="data-panel" id="dp_sale_prices_daily"><div class="pv-body" id="pv_sale_prices_daily"><p class="hint">판매단가를 입력하세요</p></div></div>
+    </div>
+</div>
+
+<!-- ─── 설정 탭 ─── -->
+<div class="tab-content" id="tab-settings">
+    <div class="section-bar">
+        <span class="section-title">설정</span>
+    </div>
+    <p class="tab-guide">보일러 사양과 운전 조건을 설정합니다. 단계별로 진행하세요. 언제든 수정 가능합니다.</p>
+    <div class="settings-steps">
+        <button class="step-btn active" data-step="step_chp">
+            <span class="step-num">1</span>CHP(열병합) 사양
+        </button>
+        <button class="step-btn" data-step="step_plb">
+            <span class="step-num">2</span>PLB(보조보일러) 사양
+        </button>
+        <button class="step-btn" data-step="step_storage">
+            <span class="step-num">3</span>축열조
+        </button>
+        <button class="step-btn" data-step="step_startup">
+            <span class="step-num">4</span>기동조건
+        </button>
+        <button class="step-btn" data-step="step_maintenance">
+            <span class="step-num">5</span>정비일정
+        </button>
+        <button class="step-btn" data-step="step_pricing">
+            <span class="step-num">6</span>전력정산 계수
+        </button>
+        <button class="step-btn" data-step="step_ext_sources">
+            <span class="step-num">7</span>외부수열원 관리
+        </button>
+        <button class="step-btn" data-step="step_elec_demand">
+            <span class="step-num">8</span>전력수요 모델링
+        </button>
+    </div>
+
+    <!-- Step 1: CHP -->
+    <div class="step-panel active" id="step_chp">
+        <h3>CHP 부하별 성능</h3>
+        <p class="hint">부하율에 따른 발전/송전/열/연료 성능을 입력하세요</p>
+        <table class="settings-tbl" id="loadTable">
+            <thead><tr><th>부하(%)</th><th>발전량(MW)</th><th>송전량(MW)</th><th>열출력(Gcal/h)</th><th>NG소모량(N㎥/h)</th><th>종합효율(%)</th></tr></thead>
+            <tbody>
+                <tr><td>100</td><td><input type="text" value="23.27"></td><td><input type="text" value="21.89"></td><td><input type="text" value="51.39"></td><td><input type="text" value="8050.1"></td><td><input type="text" value="84.9"></td></tr>
+                <tr><td>90</td><td><input type="text" value="21.01"></td><td><input type="text" value="19.67"></td><td><input type="text" value="46.84"></td><td><input type="text" value="7285.7"></td><td><input type="text" value="85.3"></td></tr>
+                <tr><td>80</td><td><input type="text" value="18.79"></td><td><input type="text" value="17.48"></td><td><input type="text" value="41.97"></td><td><input type="text" value="6474.9"></td><td><input type="text" value="85.9"></td></tr>
+                <tr><td>70</td><td><input type="text" value="16.40"></td><td><input type="text" value="15.22"></td><td><input type="text" value="36.77"></td><td><input type="text" value="5688.0"></td><td><input type="text" value="85.6"></td></tr>
+                <tr><td>60</td><td><input type="text" value="14.05"></td><td><input type="text" value="12.98"></td><td><input type="text" value="32.13"></td><td><input type="text" value="4947.4"></td><td><input type="text" value="85.5"></td></tr>
+                <tr><td>50</td><td><input type="text" value="10.83"></td><td><input type="text" value="9.19"></td><td><input type="text" value="26.71"></td><td><input type="text" value="4089.0"></td><td><input type="text" value="84.3"></td></tr>
+                <tr><td>40</td><td><input type="text" value="8.00"></td><td><input type="text" value="6.50"></td><td><input type="text" value="22.40"></td><td><input type="text" value="3347.1"></td><td><input type="text" value="83.4"></td></tr>
+                <tr><td>30</td><td><input type="text" value="5.44"></td><td><input type="text" value="4.13"></td><td><input type="text" value="16.64"></td><td><input type="text" value="2491.5"></td><td><input type="text" value="81.9"></td></tr>
+                <tr><td>20</td><td><input type="text" value="2.84"></td><td><input type="text" value="1.68"></td><td><input type="text" value="10.86"></td><td><input type="text" value="1622.8"></td><td><input type="text" value="78.4"></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Step 2: PLB -->
+    <div class="step-panel" id="step_plb">
+        <h3>PLB (보조보일러) 부하별 성능</h3>
+        <div class="setting-group">
+            <h4 class="setting-group-title">기본 사양</h4>
+            <div class="setting-grid" style="margin-bottom:12px">
+                <label>보유 대수 <input type="text" id="plbCount" value="3"></label>
+                <label>소내전력비 (천원/h/대) <input type="text" id="plbAuxCost" value="38"></label>
+            </div>
+        </div>
+        <table class="settings-tbl" id="plbLoadTable">
+            <thead><tr><th>부하(%)</th><th>열출력(Gcal/h)</th><th>효율(%)</th><th>NG소모량(N㎥/h)</th></tr></thead>
+            <tbody>
+                <tr><td>100</td><td><input type="text" value="68.80"></td><td><input type="text" value="85.12"></td><td><input type="text" value="7698"></td></tr>
+                <tr><td>90</td><td><input type="text" value="61.92"></td><td><input type="text" value="85.19"></td><td><input type="text" value="6925"></td></tr>
+                <tr><td>80</td><td><input type="text" value="55.04"></td><td><input type="text" value="85.26"></td><td><input type="text" value="6148"></td></tr>
+                <tr><td>70</td><td><input type="text" value="48.16"></td><td><input type="text" value="85.18"></td><td><input type="text" value="5388"></td></tr>
+                <tr><td>60</td><td><input type="text" value="41.28"></td><td><input type="text" value="85.10"></td><td><input type="text" value="4620"></td></tr>
+                <tr><td>50</td><td><input type="text" value="34.40"></td><td><input type="text" value="84.91"></td><td><input type="text" value="3851"></td></tr>
+                <tr><td>40</td><td><input type="text" value="27.52"></td><td><input type="text" value="84.82"></td><td><input type="text" value="3083"></td></tr>
+                <tr><td>30</td><td><input type="text" value="20.64"></td><td><input type="text" value="84.77"></td><td><input type="text" value="2315"></td></tr>
+                <tr><td>20</td><td><input type="text" value="13.76"></td><td><input type="text" value="84.72"></td><td><input type="text" value="1546"></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Step 3: 축열조 -->
+    <div class="step-panel" id="step_storage">
+        <h3>축열조 사양</h3>
+        <div class="setting-group">
+            <h4 class="setting-group-title">용량</h4>
+            <div class="setting-grid">
+                <label>총 용량 (Gcal) <input type="text" id="storageCapacity" value="1500"></label>
+                <label>초기 잔량 (Gcal) <input type="text" id="storageInitial" value="750"></label>
+                <label>최소 잔량 (Gcal) <input type="text" id="storageMinLevel" value="100"></label>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h4 class="setting-group-title">충방열 속도</h4>
+            <div class="setting-grid">
+                <label>최대 충열속도 (Gcal/h) <input type="text" id="storageChargeRate" value="150"></label>
+                <label>최대 방열속도 (Gcal/h) <input type="text" id="storageDischargeRate" value="150"></label>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h4 class="setting-group-title">PLB 연계</h4>
+            <div class="setting-grid">
+                <label>PLB 목표잔량 (Gcal) <input type="text" id="plbRecoveryTarget" value="200" title="PLB 투입 시 축열조를 이 수준까지만 회복"></label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: 기동조건 -->
+    <div class="step-panel" id="step_startup">
+        <h3>기동/정지 조건</h3>
+        <table class="settings-tbl">
+            <thead><tr><th>구분</th><th>정지 시간 기준</th><th>기동 소요시간(h)</th><th>기동 가스사용량(Nm³/h)</th></tr></thead>
+            <tbody>
+                <tr><td>Hot Start</td><td>~8시간</td><td><input type="text" id="hotTime" value="4"></td><td><input type="text" id="hotGasRate" value="300"></td></tr>
+                <tr><td>Warm Start</td><td>8~48시간</td><td><input type="text" id="warmTime" value="6"></td><td><input type="text" id="warmGasRate" value="350"></td></tr>
+                <tr><td>Cold Start</td><td>48시간+</td><td><input type="text" id="coldTime" value="8"></td><td><input type="text" id="coldGasRate" value="400"></td></tr>
+            </tbody>
+        </table>
+        <div style="font-size:11px;font-weight:600;color:#475569;margin-top:14px">CHP</div>
+        <div class="setting-grid" style="margin-top:4px">
+            <label>최소운전시간 (h) <input type="text" id="chpMinRunHours" value="4"></label>
+            <label>최소정지시간 (h) <input type="text" id="chpMinStopHours" value="4"></label>
+            <label>최소부하 (%) <input type="text" id="chpMinLoad" value="60"></label>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:#475569;margin-top:10px">PLB</div>
+        <div class="setting-grid" style="margin-top:4px">
+            <label>최소운전시간 (h) <input type="text" id="plbMinRunHours" value="2"></label>
+        </div>
+    </div>
+
+    <!-- Step 5: 정비일정 -->
+    <div class="step-panel" id="step_maintenance">
+        <h3>CHP 계획예방정비</h3>
+        <p class="hint">정비 기간 중 CHP는 정지됩니다. 최대 3건 입력 가능 (비수기 권장)</p>
+        <div class="maint-list">
+            <div class="maint-row">
+                <span class="maint-label">정비 1</span>
+                <input type="text" id="mt1StartM" placeholder="월" class="maint-input">
+                <input type="text" id="mt1StartD" placeholder="일" class="maint-input">
+                <span class="maint-sep">~</span>
+                <input type="text" id="mt1EndM" placeholder="월" class="maint-input">
+                <input type="text" id="mt1EndD" placeholder="일" class="maint-input">
+            </div>
+            <div class="maint-row">
+                <span class="maint-label">정비 2</span>
+                <input type="text" id="mt2StartM" placeholder="월" class="maint-input">
+                <input type="text" id="mt2StartD" placeholder="일" class="maint-input">
+                <span class="maint-sep">~</span>
+                <input type="text" id="mt2EndM" placeholder="월" class="maint-input">
+                <input type="text" id="mt2EndD" placeholder="일" class="maint-input">
+            </div>
+            <div class="maint-row">
+                <span class="maint-label">정비 3</span>
+                <input type="text" id="mt3StartM" placeholder="월" class="maint-input">
+                <input type="text" id="mt3StartD" placeholder="일" class="maint-input">
+                <span class="maint-sep">~</span>
+                <input type="text" id="mt3EndM" placeholder="월" class="maint-input">
+                <input type="text" id="mt3EndD" placeholder="일" class="maint-input">
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 6: 단가산정 -->
+    <div class="step-panel" id="step_pricing">
+        <h3>단가산정 파라미터</h3>
+        <p class="hint">전력시장 정산(SMP→MP 변환)에 필요한 계수입니다. 증분계수와 상수는 연간 고정, 열량단가는 월별 변동합니다.</p>
+        <div class="setting-grid" style="margin-bottom:12px">
+            <label>1차증분계수 <input type="text" id="pricingInc1" value="0.006531"></label>
+            <label>2차증분계수 <input type="text" id="pricingInc2" value="2.232646"></label>
+            <label>상수 <input type="text" id="pricingConst" value="11.855754"></label>
+        </div>
+        <div id="pricingFormulaSummary" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#0369a1;line-height:1.6">
+            <b>계산 공식</b> &nbsp;(CHP 22MW 기준)<br>
+            NLPC = 상수 × 열량단가 &nbsp;|&nbsp; 무부하비 = NLPC / 22,000 &nbsp;|&nbsp; 무부하비정산 = 무부하비 × 1/(1+2.6327)<br>
+            <b>MP = SMP × TLF + 무부하비정산</b>
+        </div>
+        <div id="pricingSaveStatus" style="font-size:11px;color:#16a34a;margin-bottom:6px;opacity:0;transition:opacity 0.3s"></div>
+        <h4 style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">월별 단가 산정</h4>
+        <table class="settings-tbl" id="pricingHeatTable">
+            <thead><tr>
+                <th>월</th>
+                <th>열량단가(원)</th>
+                <th style="color:#6366f1;font-size:10px">NLPC</th>
+                <th style="color:#6366f1;font-size:10px">무부하비<br>(원/kWh)</th>
+                <th style="color:#059669;font-weight:700">무부하비정산<br>(원/kWh)</th>
+            </tr></thead>
+            <tbody>
+                <tr data-m="1"><td>1</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="2"><td>2</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="3"><td>3</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="4"><td>4</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="5"><td>5</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="6"><td>6</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="7"><td>7</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="8"><td>8</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="9"><td>9</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="10"><td>10</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="11"><td>11</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+                <tr data-m="12"><td>12</td><td><input type="text" value="0"></td><td class="pc nlpc" style="color:#6366f1">-</td><td class="pc nlc" style="color:#6366f1">-</td><td class="pc nls" style="color:#059669;font-weight:600">-</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Step 7: 외부수열원 관리 -->
+    <div class="step-panel" id="step_ext_sources">
+        <h3>외부수열원 활성/비활성</h3>
+        <p class="hint">시뮬레이션에 포함할 열원을 토글로 관리합니다. 수열원 추가는 데이터 > 외부거래 탭에서 할 수 있습니다.</p>
+        <div id="extSourcesTable"></div>
+    </div>
+
+    <!-- Step 8: 전력수요 모델링 -->
+    <div class="step-panel" id="step_elec_demand">
+        <h3>전력수요 모델링</h3>
+        <p class="hint" style="margin-bottom:16px">실적 수전량 + 열제약송전량에서 건물/설비 고유 전력수요를 역산합니다. 시뮬 결과에 따라 계획 수전량을 자동 산출합니다.</p>
+
+        <div class="edm-row">
+            <div class="edm-card">
+                <div class="edm-card-head">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    <span>기본 보정</span>
+                </div>
+                <div class="edm-field">
+                    <span class="edm-label">대기전력 (최소)</span>
+                    <div class="edm-input-wrap">
+                        <input type="text" id="standbyPowerKW" value="0" title="시간별 수요의 최소값 (이 값 아래로 내려가지 않음)">
+                        <span class="edm-unit">kW</span>
+                    </div>
+                </div>
+                <div class="edm-field">
+                    <span class="edm-label">수요 증감율</span>
+                    <div class="edm-input-wrap">
+                        <input type="text" id="demandGrowthPct" value="0" title="설비 증가 등 총 수요 증감">
+                        <span class="edm-unit">%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="edm-card">
+                <div class="edm-card-head">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>시간대 보정</span>
+                </div>
+                <div class="edm-field">
+                    <span class="edm-label">주간 (07~22시)</span>
+                    <div class="edm-input-wrap">
+                        <input type="text" id="demandDayFactor" value="1.0" title="주간 시간대 수요에 곱하는 계수">
+                        <span class="edm-unit">배</span>
+                    </div>
+                </div>
+                <div class="edm-field">
+                    <span class="edm-label">야간 (22~07시)</span>
+                    <div class="edm-input-wrap">
+                        <input type="text" id="demandNightFactor" value="1.0" title="야간 시간대 수요에 곱하는 계수">
+                        <span class="edm-unit">배</span>
+                    </div>
+                </div>
+            </div>
+            <div class="edm-card edm-card-info">
+                <div class="edm-card-head">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    <span>추정 대기전력</span>
+                </div>
+                <div id="estimatedStandbyPower" class="edm-estimate">
+                    수전량 데이터 업로드 후<br>"실적에서 추출" 시 자동 표시
+                </div>
+            </div>
+        </div>
+
+        <div class="edm-monthly">
+            <div class="edm-card-head" style="margin-bottom:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>월별 수요 보정계수</span>
+                <span class="edm-hint">1.0 = 변경없음 · 1.1 = 10%↑ · 0.9 = 10%↓</span>
+            </div>
+            <div class="edm-month-grid" id="monthlyDemandFactors">
+                <div class="edm-month-cell"><span>1월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>2월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>3월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>4월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>5월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>6월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>7월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>8월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>9월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>10월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>11월</span><input type="text" value="1.0"></div>
+                <div class="edm-month-cell"><span>12월</span><input type="text" value="1.0"></div>
+            </div>
+        </div>
+
+        <div class="edm-monthly" style="margin-top:12px">
+            <div class="edm-card-head" style="margin-bottom:4px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                <span>월별 평균 전력수요</span>
+                <span class="edm-hint">실적 데이터 없이 수요를 직접 정의합니다 (업로드 데이터가 있으면 업로드 우선)</span>
+            </div>
+            <div class="edm-month-grid" id="monthlyDemandKW">
+                <div class="edm-month-cell"><span>1월</span><input type="text" value="13478"></div>
+                <div class="edm-month-cell"><span>2월</span><input type="text" value="7146"></div>
+                <div class="edm-month-cell"><span>3월</span><input type="text" value="4313"></div>
+                <div class="edm-month-cell"><span>4월</span><input type="text" value="1200"></div>
+                <div class="edm-month-cell"><span>5월</span><input type="text" value="592"></div>
+                <div class="edm-month-cell"><span>6월</span><input type="text" value="540"></div>
+                <div class="edm-month-cell"><span>7월</span><input type="text" value="595"></div>
+                <div class="edm-month-cell"><span>8월</span><input type="text" value="613"></div>
+                <div class="edm-month-cell"><span>9월</span><input type="text" value="570"></div>
+                <div class="edm-month-cell"><span>10월</span><input type="text" value="503"></div>
+                <div class="edm-month-cell"><span>11월</span><input type="text" value="765"></div>
+                <div class="edm-month-cell"><span>12월</span><input type="text" value="4199"></div>
+            </div>
+            <div style="font-size:10px;color:#64748b;margin-top:6px">단위: kW (시간당 평균 사용량). 예: 1000 = 매 시간 1,000kWh 소비</div>
+        </div>
+
+        <div class="edm-monthly" style="margin-top:12px">
+            <div class="edm-card-head" style="margin-bottom:4px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <span>24시간 수요 패턴</span>
+                <span class="edm-hint">시간대별 비율 (1.0 = 평균, 1.5 = 평균의 1.5배)</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px" id="hourlyDemandPattern">
+                <div class="edm-month-cell"><span>0시</span><input type="text" value="0.65"></div>
+                <div class="edm-month-cell"><span>1시</span><input type="text" value="0.51"></div>
+                <div class="edm-month-cell"><span>2시</span><input type="text" value="0.49"></div>
+                <div class="edm-month-cell"><span>3시</span><input type="text" value="0.50"></div>
+                <div class="edm-month-cell"><span>4시</span><input type="text" value="0.50"></div>
+                <div class="edm-month-cell"><span>5시</span><input type="text" value="0.50"></div>
+                <div class="edm-month-cell"><span>6시</span><input type="text" value="0.52"></div>
+                <div class="edm-month-cell"><span>7시</span><input type="text" value="0.58"></div>
+                <div class="edm-month-cell"><span>8시</span><input type="text" value="0.87"></div>
+                <div class="edm-month-cell"><span>9시</span><input type="text" value="1.21"></div>
+                <div class="edm-month-cell"><span>10시</span><input type="text" value="1.22"></div>
+                <div class="edm-month-cell"><span>11시</span><input type="text" value="1.24"></div>
+                <div class="edm-month-cell"><span>12시</span><input type="text" value="1.25"></div>
+                <div class="edm-month-cell"><span>13시</span><input type="text" value="1.23"></div>
+                <div class="edm-month-cell"><span>14시</span><input type="text" value="1.26"></div>
+                <div class="edm-month-cell"><span>15시</span><input type="text" value="1.27"></div>
+                <div class="edm-month-cell"><span>16시</span><input type="text" value="1.28"></div>
+                <div class="edm-month-cell"><span>17시</span><input type="text" value="1.31"></div>
+                <div class="edm-month-cell"><span>18시</span><input type="text" value="1.35"></div>
+                <div class="edm-month-cell"><span>19시</span><input type="text" value="1.38"></div>
+                <div class="edm-month-cell"><span>20시</span><input type="text" value="1.36"></div>
+                <div class="edm-month-cell"><span>21시</span><input type="text" value="1.31"></div>
+                <div class="edm-month-cell"><span>22시</span><input type="text" value="1.22"></div>
+                <div class="edm-month-cell"><span>23시</span><input type="text" value="1.02"></div>
+            </div>
+        </div>
+        <div style="margin-top:8px">
+            <button class="btn-sm" onclick="applyDemandFromHistory()" title="업로드된 수전량 실적에서 월별 평균과 시간패턴을 자동 추출합니다">실적에서 추출</button>
+            <span style="font-size:10px;color:#64748b;margin-left:8px">수전량 데이터가 업로드되어 있으면 자동으로 값을 채웁니다</span>
+        </div>
+    </div>
+
+    <!-- 값 적용 버튼 -->
+    <div id="settingsApplyBar" style="position:sticky;bottom:0;background:var(--bg-card,#141414);border-top:1px solid var(--border-default,#262626);padding:12px 16px;display:none;align-items:center;gap:12px;z-index:10">
+        <span id="settingsChanged" style="font-size:11px;color:#FFB74D;font-weight:600">⚠ 설정이 변경되었습니다</span>
+        <button id="settingsApplyBtn" style="margin-left:auto;padding:8px 24px;background:#4B83F0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:background .2s">값 적용</button>
+        <button id="settingsResetBtn" style="padding:8px 16px;background:transparent;color:#999;border:1px solid #444;border-radius:8px;font-size:12px;cursor:pointer;transition:all .2s">되돌리기</button>
+    </div>
+
+</div>
+
+<!-- ─── 데이터 산출 탭 ─── -->
+<div class="tab-content" id="tab-calc">
+    <div class="section-bar">
+        <span class="section-title">데이터 산출</span>
+        <span id="calcStatus" style="font-size:11px;color:#999;margin-left:8px"></span>
+    </div>
+    <p class="tab-guide">입력 데이터가 갖춰지면 자동으로 산출됩니다</p>
+    <div class="inner-tabs" id="calcTabs">
+        <button class="inner-tab active" data-ctab="calc_mp">MP(시장가격)</button>
+        <button class="inner-tab" data-ctab="calc_cp">용량요금</button>
+        <button class="inner-tab" data-ctab="calc_ext_heat">외부수열비</button>
+        <button class="inner-tab" data-ctab="calc_heat_sales">열판매매출</button>
+        <button class="inner-tab" data-ctab="calc_water_chem">용수약품비용</button>
+    </div>
+    <div class="calc-panel active" id="calc_mp">
+        <div class="pv-body" id="pv_calc_mp">
+            <p class="hint">SMP, CP/TLF, 단가산정 데이터를 입력한 후 "전체 산출" 버튼을 클릭하세요</p>
+        </div>
+    </div>
+    <div class="calc-panel" id="calc_cp">
+        <div class="pv-body" id="pv_calc_cp">
+            <p class="hint">CP/TLF + 공휴일 데이터를 입력한 후 "전체 산출" 버튼을 클릭하세요</p>
+        </div>
+    </div>
+    <div class="calc-panel" id="calc_ext_heat">
+        <div class="pv-body" id="pv_calc_ext_heat">
+            <p class="hint">운영실적 + 판매단가 데이터를 입력한 후 "전체 산출" 버튼을 클릭하세요</p>
+        </div>
+    </div>
+    <div class="calc-panel" id="calc_heat_sales">
+        <div class="pv-body" id="pv_calc_heat_sales">
+            <p class="hint">판매실적 + 열요금표/판매단가 데이터를 입력한 후 "전체 산출" 버튼을 클릭하세요</p>
+        </div>
+    </div>
+    <div class="calc-panel" id="calc_water_chem">
+        <div class="pv-body" id="pv_calc_water_chem">
+            <p class="hint">용수약품 사용량 + 수도/약품 단가 데이터를 입력한 후 "전체 산출" 버튼을 클릭하세요</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- ─── 기동계획 탭 ─── -->
+<div class="tab-content" id="tab-plan">
+    <div class="section-bar">
+        <span class="section-title">기동계획</span>
+        <div class="plan-btn-group" id="planBtnGroup">
+            <button class="plan-btn plan-btn--left active" onclick="document.querySelectorAll('#planBtnGroup .plan-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');runOptimization()" title="빠르게 계산합니다 (1초 미만)">기본 최적화</button>
+            <button class="plan-btn plan-btn--right" onclick="document.querySelectorAll('#planBtnGroup .plan-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');runMILPOptimization()" title="더 정확한 최적 조합을 찾습니다 (수초 소요)">정밀 최적화</button>
+        </div>
+        <button class="plan-btn plan-btn--ghost" onclick="showLogicFlowModal()" id="btnShowLogicFlow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;opacity:.7"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>로직 흐름</button>
+        <span id="solverStatus" class="solver-status"></span>
+    </div>
+    <p class="tab-guide">CHP·PLB 최적 운전 조합을 자동으로 계산합니다</p>
+    <!-- 열수급현황 (항상 표시) -->
+    <div id="pv_plan_monthly"></div>
+    <!-- 시뮬레이션 결과 (실행 후 표시) -->
+    <div id="planSimResult" style="display:none">
+        <!-- 용어 안내 제거 -->
+        <div class="inner-tabs" id="planTabs" style="margin-top:16px">
+            <button class="inner-tab active" data-ptab="plan_monthly_sim">월별</button>
+            <button class="inner-tab" data-ptab="plan_daily">일별</button>
+            <span style="font-size:11px;color:#94a3b8;margin-left:8px;align-self:center">월별 요약 또는 일별 상세를 확인합니다. 일별에서 행을 클릭하면 시간별 운전현황을 볼 수 있습니다.</span>
+        </div>
+        <div class="plan-panel active" id="plan_monthly_sim"><div id="pv_plan_monthly_sim"></div></div>
+        <div class="plan-panel" id="plan_daily"><div id="pv_plan_daily"></div></div>
+    </div>
+</div>
+
+<!-- ─── 비용산출 탭 ─── -->
+<div class="tab-content" id="tab-cost">
+    <div class="section-bar">
+        <span class="section-title">비용산출</span>
+    </div>
+    <p class="tab-guide">기동계획 결과를 바탕으로 전력수요 모델링 및 비용을 상세 분석합니다</p>
+    <div class="inner-tabs" id="costTabs">
+        <button class="inner-tab active" data-costtab="cost_elec_demand">전력수요</button>
+        <button class="inner-tab" data-costtab="cost_elec_cost">전력비</button>
+        <button class="inner-tab" data-costtab="cost_gas">가스비</button>
+        <button class="inner-tab" data-costtab="cost_water_chem">용수약품비</button>
+        <button class="inner-tab" data-costtab="cost_ext_heat">수열비</button>
+    </div>
+    <div class="cost-panel active" id="cost_elec_demand">
+        <div class="pv-body" id="pv_calc_elec_demand">
+            <p class="hint">수전량 데이터를 업로드하고 기동계획을 실행하면 전력수요 프로파일이 표시됩니다</p>
+        </div>
+    </div>
+    <div class="cost-panel" id="cost_elec_cost">
+        <div class="pv-body" id="pv_calc_elec_cost">
+            <p class="hint">기동계획 실행 후 실적/계획 전력비가 비교 표시됩니다</p>
+        </div>
+    </div>
+    <div class="cost-panel" id="cost_gas">
+        <div class="pv-body" id="pv_cost_gas">
+            <p class="hint">기동계획 실행 후 가스비가 표시됩니다</p>
+        </div>
+    </div>
+    <div class="cost-panel" id="cost_water_chem">
+        <div class="pv-body" id="pv_cost_water_chem">
+            <p class="hint">기동계획 실행 후 용수약품비가 표시됩니다</p>
+        </div>
+    </div>
+    <div class="cost-panel" id="cost_ext_heat">
+        <div class="pv-body" id="pv_cost_ext_heat">
+            <p class="hint">기동계획 실행 후 수열비가 표시됩니다</p>
+        </div>
+    </div>
+</div>
+
+<!-- ─── 운영손익 탭 ─── -->
+<div class="tab-content" id="tab-result">
+    <div class="section-bar">
+        <span class="section-title">운영손익</span>
+    </div>
+    <p class="tab-guide">기동계획 결과를 바탕으로 매출·비용·이익을 분석합니다</p>
+    <div id="pv_res_contribution"><p class="hint">기동계획 실행 후 손익이 표시됩니다</p></div>
+</div>
+
+</div><!-- /appScreen -->
+
+
+<!-- Chart.js 다크 테마 글로벌 설정 (app.js 로드 전에 실행) -->
+<script>
+(function() {
+    const d = Chart.defaults;
+    // 글로벌 폰트
+    d.font.family = "'Pretendard','Inter',-apple-system,sans-serif";
+    d.font.size = 11;
+    d.color = '#999';
+    // 그리드/축
+    d.scale.grid.color = 'rgba(255,255,255,.06)';
+    d.scale.grid.drawBorder = false;
+    d.scale.ticks.color = '#999';
+    d.scale.border = d.scale.border || {};
+    d.scale.border.color = 'rgba(255,255,255,.08)';
+    // 범례
+    d.plugins.legend.labels.color = '#b0b0b0';
+    d.plugins.legend.labels.font = { size: 11 };
+    d.plugins.legend.labels.boxWidth = 12;
+    d.plugins.legend.labels.padding = 16;
+    // 툴팁
+    d.plugins.tooltip.backgroundColor = 'rgba(20,20,20,.92)';
+    d.plugins.tooltip.titleColor = '#e0e0e0';
+    d.plugins.tooltip.bodyColor = '#d0d0d0';
+    d.plugins.tooltip.borderColor = 'rgba(255,255,255,.1)';
+    d.plugins.tooltip.borderWidth = 1;
+    d.plugins.tooltip.cornerRadius = 6;
+    d.plugins.tooltip.padding = 10;
+    // 반응형
+    d.responsive = true;
+    d.maintainAspectRatio = true;
+    d.aspectRatio = 2.5;
+
+    // 바 차트 — 슬림하고 균일한 폭
+    d.datasets = d.datasets || {};
+    d.datasets.bar = d.datasets.bar || {};
+    d.datasets.bar.barPercentage = 0.6;
+    d.datasets.bar.categoryPercentage = 0.7;
+    d.datasets.bar.borderRadius = 3;
+    d.datasets.bar.borderSkipped = false;
+
+    // Y축 폭 고정 플러그인 — 데이터 값에 따라 축 폭이 변하는 문제 방지
+    Chart.register({
+        id: 'fixedAxisWidth',
+        afterFit(scale) {
+            if (scale.position === 'left')  scale.width = Math.max(scale.width, 50);
+            if (scale.position === 'right') scale.width = Math.max(scale.width, 50);
+        }
+    });
+})();
+</script>
+<script src="js/app.js"></script>
+</body>
+</html>
