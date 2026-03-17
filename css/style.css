@@ -727,8 +727,8 @@ td[style*="position:sticky"] {
 }
 @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
 .day-modal-box {
-    background:#161616; border:1px solid #404040; border-radius:14px; padding:24px 28px;
-    width:92vw; max-width:1100px; max-height:90vh; overflow:auto;
+    background:#161616; border:1px solid #404040; border-radius:14px; padding:28px 32px;
+    width:96vw; max-width:1400px; max-height:94vh; overflow:auto;
     box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 16px 64px rgba(0,0,0,.7);
     animation: scaleIn .2s ease-out; color:#d4d4d4;
 }

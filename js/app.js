@@ -2342,17 +2342,20 @@ function runDailySimulation() {
         const chpIsCheaper = cost100.costPerGcal < d.plbCostPerGcal;
 
         if (chpIsProfitable) {
-            // CHP 이익 → 24시간 (축열조 제약은 Pass 2에서 조정)
+            // CHP 이익 → 24시간, 경제성 최적 부하 선택
             plan[d.idx].chpHours = 24;
-            plan[d.idx].chpLoad = 100;
+            plan[d.idx].chpLoad = d.bestLoad.load;
+            plan[d.idx].chpPerf = chpPerf.find(p => p.load === d.bestLoad.load) || perf100;
         } else if (chpIsCheaper) {
-            // CHP가 PLB보다 쌈 → 열필요 기반 시간
+            // CHP가 PLB보다 쌈 → 열필요 기반 시간, 최적 부하
+            const optPerf = chpPerf.find(p => p.load === d.bestLoad.load) || perf100;
             const heatNeeded = Math.max(0, d.netRequired);
-            const hoursNeeded = perf100.heatRate > 0 ? Math.ceil(heatNeeded / perf100.heatRate) : 0;
+            const hoursNeeded = optPerf.heatRate > 0 ? Math.ceil(heatNeeded / optPerf.heatRate) : 0;
             plan[d.idx].chpHours = Math.min(24, hoursNeeded);
-            plan[d.idx].chpLoad = 100;
+            plan[d.idx].chpLoad = d.bestLoad.load;
+            plan[d.idx].chpPerf = optPerf;
         } else {
-            // PLB가 더 쌈 → CHP 최소 (축열조 버퍼로 가능하면 정지)
+            // PLB가 더 쌈 → CHP 정지
             plan[d.idx].chpHours = 0;
             plan[d.idx].chpLoad = 100;
         }
@@ -2440,7 +2443,7 @@ function runDailySimulation() {
         // ─── 축열조 기반 가동시간 조정 ───
         let chpHours = p.chpHours;
         let chpLoadPct = p.chpLoad;
-        let selectedPerf = perf100;
+        let selectedPerf = chpPerf.find(pp => pp.load === chpLoadPct) || perf100;
 
         // 축열조 가용 공간 기반 최대 가동시간 (100%)
         // CHP열은 수요 충당 + 축열조 여유공간까지만 (과생산 방지)
@@ -2587,30 +2590,34 @@ function runDailySimulation() {
         const demandH = d.demandH;
         const smpH = d.smpH || Array(24).fill(d.smpAvg);
 
-        // CHP 연속 블록: SMP 최대 + 오버플로/언더플로 방지 + 일간 연속성
+        // CHP 연속 블록: SMP 최대 + overflow 완전 거부 (R2) + 일간 연속성
         let chpStart = 0;
         if (chpHours > 0 && chpHours < 24) {
             let bestScore = -Infinity;
-            for (let s = 0; s <= 24 - chpHours; s++) {
-                // 일간 연속성: 전날 CHP가 24시 근처까지 돌았으면, 오늘 0시부터 시작해야 함
-                // 전날 종료~오늘 시작 간격 < 최소정지시간이면 부적합
-                const gapFromPrev = s + (24 - prevChpEndH); // 전날 종료 후 경과시간
-                if (prevChpOn && gapFromPrev > 0 && gapFromPrev < minStopTime) {
-                    continue; // 최소정지시간 미달 → 이 시작시간 제외
-                }
+            // overflow 없는 배치를 우선 탐색, 없으면 CHP 시간 축소
+            let tryHours = chpHours;
+            while (tryHours >= minRunTime) {
+                bestScore = -Infinity;
+                for (let s = 0; s <= 24 - tryHours; s++) {
+                    const gapFromPrev = s + (24 - prevChpEndH);
+                    if (prevChpOn && gapFromPrev > 0 && gapFromPrev < minStopTime) continue;
 
-                let stSim = storageLevel, smpSum = 0, overflow = 0, underflow = 0;
-                for (let h = 0; h < 24; h++) {
-                    const chp = (h >= s && h < s + chpHours) ? chpHeatPerH : 0;
-                    stSim = stSim + (hourlyExt + intecoH + chp - demandH[h]);
-                    if (stSim > storageCap) { overflow += stSim - storageCap; stSim = storageCap; }
-                    if (stSim < storageMin) { underflow += storageMin - stSim; stSim = storageMin; }
-                    if (h >= s && h < s + chpHours) smpSum += d.mpH[h];
+                    let stSim = storageLevel, smpSum = 0, overflow = 0, underflow = 0;
+                    for (let h = 0; h < 24; h++) {
+                        const chp = (h >= s && h < s + tryHours) ? chpHeatPerH : 0;
+                        stSim = stSim + (hourlyExt + intecoH + chp - demandH[h]);
+                        if (stSim > storageCap) { overflow += stSim - storageCap; stSim = storageCap; }
+                        if (stSim < storageMin) { underflow += storageMin - stSim; stSim = storageMin; }
+                        if (h >= s && h < s + tryHours) smpSum += d.mpH[h];
+                    }
+                    if (overflow > 0) continue; // R2: overflow 배치 완전 거부
+                    const score = smpSum - underflow * 200;
+                    if (score > bestScore) { bestScore = score; chpStart = s; chpHours = tryHours; }
                 }
-                // PLB 회피: underflow 패널티 (축열조 부족 → PLB 투입 유발)
-                const score = smpSum - overflow * 50 - underflow * 200;
-                if (score > bestScore) { bestScore = score; chpStart = s; }
+                if (bestScore > -Infinity) break; // overflow 없는 배치 찾음
+                tryHours--; // 모든 배치 overflow → 1시간 줄여서 재시도
             }
+            if (bestScore === -Infinity) chpHours = 0; // 어떤 배치도 불가 → 미가동
         }
 
         // PLB: 축열조가 부족한 시점에 배치
@@ -2626,25 +2633,35 @@ function runDailySimulation() {
         let plbHeat = 0, plbUnits = 0, plbHours = 0, plbNg = 0, plbLoad = 0;
         let plbStartH = 0;
         if (needPlb) {
-            // 부족분 계산
-            let stSim2 = storageLevel, minSt = storageLevel;
+            // 부족분 계산 (R1: 축열조 하한 방지)
+            let stSim2 = storageLevel, minSt = storageLevel, minStH = 0;
             for (let h = 0; h < 24; h++) {
                 const chp = (chpHours >= 24 || (h >= chpStart && h < chpStart + chpHours)) ? chpHeatPerH : 0;
                 stSim2 = stSim2 + (hourlyExt + intecoH + chp - demandH[h]);
                 if (stSim2 > storageCap) stSim2 = storageCap;
-                if (stSim2 < minSt) minSt = stSim2;
+                if (stSim2 < minSt) { minSt = stSim2; minStH = h; }
             }
             const deficit = storageMin - minSt;
             if (deficit > 0) {
-                plbUnits = Math.min(plbCount, Math.ceil(deficit / plb1DayCap));
+                // PLB 투입량: deficit 기반, 과투입 방지 (deficit의 2배 상한)
+                const targetHeat = Math.min(deficit * 2, plb1DayCap);
                 const bestPlb = plbTable[0];
+                // 대수: 1대로 커버 가능하면 1대
+                plbUnits = Math.ceil(deficit / (bestPlb.열Gcal * Math.max(plbMinRunHours, 1)));
+                plbUnits = Math.min(plbUnits, plbCount);
+                if (plbUnits < 1) plbUnits = 1;
                 plbLoad = bestPlb.load;
                 plbHours = Math.ceil(deficit / (plbUnits * bestPlb.열Gcal));
                 plbHours = Math.max(plbMinRunHours, Math.min(24 - chpHours, plbHours));
+                // 과투입 상한: 실제 투입열이 deficit*2를 넘지 않게
+                const actualHeat = plbHours * plbUnits * bestPlb.열Gcal;
+                if (actualHeat > deficit * 2 && plbHours > plbMinRunHours) {
+                    plbHours = Math.max(plbMinRunHours, Math.ceil(deficit * 2 / (plbUnits * bestPlb.열Gcal)));
+                }
                 plbHeat = plbHours * plbUnits * bestPlb.열Gcal;
                 plbNg = plbHours * plbUnits * bestPlb.ngNm3;
-                // PLB를 축열조 부족 직전에 배치 (피크시간대)
-                plbStartH = Math.max(0, Math.round(12 - plbHours / 2));
+                // PLB를 부족 시점 직전에 배치
+                plbStartH = Math.max(0, minStH - plbHours);
             }
         }
 
@@ -2655,13 +2672,19 @@ function runDailySimulation() {
             const chp = (chpHours >= 24 || (h >= chpStart && h < chpStart + chpHours && chpHours > 0)) ? chpHeatPerH : 0;
             const plb = (plbHours > 0 && h >= plbStartH && h < plbStartH + plbHours)
                 ? (plbHeat / plbHours) : 0;
-            stH = stH + (hourlyExt + intecoH + chp + plb - demandH[h]);
+            // R2: overflow 방지 — CHP 열출력을 축열조 상한에 맞게 자동 감소
+            let actualChp = chp;
+            const projected = stH + hourlyExt + intecoH + actualChp + plb - demandH[h];
+            if (projected > storageCap && actualChp > 0) {
+                actualChp = Math.max(0, storageCap - stH - hourlyExt - intecoH - plb + demandH[h]);
+            }
+            stH = stH + (hourlyExt + intecoH + actualChp + plb - demandH[h]);
             if (stH > storageCap) stH = storageCap;
             if (stH < storageMin) stH = storageMin;
-            const chpPowerKWh = (chp > 0) ? selectedPerf.powerMW * 1000 : 0;
-            hourly.push({ hour: h, demand: demandH[h], ext: hourlyExt + intecoH, chp, plb, storage: Math.round(stH), smp: smpH[h], mp: d.mpH[h], chpPowerKWh });
+            const chpPowerKWh = (actualChp > 0) ? selectedPerf.powerMW * 1000 * (actualChp / (chpHeatPerH || 1)) : 0;
+            hourly.push({ hour: h, demand: demandH[h], ext: hourlyExt + intecoH, chp: actualChp, plb, storage: Math.round(stH), smp: smpH[h], mp: d.mpH[h], chpPowerKWh });
         }
-        storageLevel = stH; // 시간별 시뮬레이션 최종 축열조 → 다음날로 전달
+        storageLevel = stH;
 
         // ═══ 4단계: 일별 집계 ═══
         const chpHeat = chpHours * chpHeatPerH;
@@ -2916,52 +2939,63 @@ function solveDP() {
         const intecoH = d.adjIntecoNet / 24;
         const demandH = d.demandH;
 
-        // ═══ 2단계: CHP 연속 블록 배치 ═══
+        // ═══ 2단계: CHP 연속 블록 배치 (R2: overflow 완전 거부) ═══
         let chpStart = 0;
         if (chpHours > 0 && chpHours < 24) {
             let bestScore = -Infinity;
-            for (let s = 0; s <= 24 - chpHours; s++) {
-                // 최소정지시간 제약
-                const gapFromPrev = s + (24 - prevChpEndH_dp);
-                if (prevChpOn_dp && gapFromPrev > 0 && gapFromPrev < minStopTime) {
-                    continue;
-                }
+            let tryHours = chpHours;
+            while (tryHours >= minRunTime) {
+                bestScore = -Infinity;
+                for (let s = 0; s <= 24 - tryHours; s++) {
+                    const gapFromPrev = s + (24 - prevChpEndH_dp);
+                    if (prevChpOn_dp && gapFromPrev > 0 && gapFromPrev < minStopTime) continue;
 
-                let stSim = storageLevel, smpSum = 0, overflow = 0, underflow = 0;
-                for (let h = 0; h < 24; h++) {
-                    const chp = (h >= s && h < s + chpHours) ? chpHeatPerH : 0;
-                    stSim = stSim + (hourlyExt + intecoH + chp - demandH[h]);
-                    if (stSim > storageCap) { overflow += stSim - storageCap; stSim = storageCap; }
-                    if (stSim < storageMin) { underflow += storageMin - stSim; stSim = storageMin; }
-                    if (h >= s && h < s + chpHours) smpSum += d.mpH[h];
+                    let stSim = storageLevel, smpSum = 0, overflow = 0, underflow = 0;
+                    for (let h = 0; h < 24; h++) {
+                        const chp = (h >= s && h < s + tryHours) ? chpHeatPerH : 0;
+                        stSim = stSim + (hourlyExt + intecoH + chp - demandH[h]);
+                        if (stSim > storageCap) { overflow += stSim - storageCap; stSim = storageCap; }
+                        if (stSim < storageMin) { underflow += storageMin - stSim; stSim = storageMin; }
+                        if (h >= s && h < s + tryHours) smpSum += d.mpH[h];
+                    }
+                    if (overflow > 0) continue;
+                    const score = smpSum - underflow * 200;
+                    if (score > bestScore) { bestScore = score; chpStart = s; chpHours = tryHours; }
                 }
-                const score = smpSum - overflow * 50 - underflow * 200;
-                if (score > bestScore) { bestScore = score; chpStart = s; }
+                if (bestScore > -Infinity) break;
+                tryHours--;
             }
+            if (bestScore === -Infinity) chpHours = 0;
         }
 
-        // PLB 필요 여부 시간별 검증
-        let stCheck = storageLevel, needPlb = false, minSt = storageLevel;
+        // PLB 필요 여부 시간별 검증 (R1)
+        let stCheck = storageLevel, needPlb = false, minSt_dp = storageLevel, minStH_dp = 0;
         for (let h = 0; h < 24; h++) {
             const chp = (chpHours >= 24 || (h >= chpStart && h < chpStart + chpHours && chpHours > 0)) ? chpHeatPerH : 0;
             stCheck = stCheck + (hourlyExt + intecoH + chp - demandH[h]);
             if (stCheck > storageCap) stCheck = storageCap;
-            if (stCheck < minSt) minSt = stCheck;
+            if (stCheck < minSt_dp) { minSt_dp = stCheck; minStH_dp = h; }
             if (stCheck < storageMin) needPlb = true;
         }
 
         let plbHeat = 0, plbUnits = 0, plbHours = 0, plbNg = 0, plbLoad = 0, plbStartH = 0;
         if (needPlb) {
-            const deficit = storageMin - minSt;
+            const deficit = storageMin - minSt_dp;
             if (deficit > 0) {
-                plbUnits = Math.min(plbCount, Math.ceil(deficit / (plbMaxCap * 24)));
                 const bestPlb = plbTable[0];
+                plbUnits = Math.ceil(deficit / (bestPlb.열Gcal * Math.max(plbMinRunHours, 1)));
+                plbUnits = Math.min(plbUnits, plbCount);
+                if (plbUnits < 1) plbUnits = 1;
                 plbLoad = bestPlb.load;
                 plbHours = Math.ceil(deficit / (plbUnits * bestPlb.열Gcal));
                 plbHours = Math.max(plbMinRunHours, Math.min(24 - chpHours, plbHours));
+                const actualHeat = plbHours * plbUnits * bestPlb.열Gcal;
+                if (actualHeat > deficit * 2 && plbHours > plbMinRunHours) {
+                    plbHours = Math.max(plbMinRunHours, Math.ceil(deficit * 2 / (plbUnits * bestPlb.열Gcal)));
+                }
                 plbHeat = plbHours * plbUnits * bestPlb.열Gcal;
                 plbNg = plbHours * plbUnits * bestPlb.ngNm3;
-                plbStartH = Math.max(0, Math.round(12 - plbHours / 2));
+                plbStartH = Math.max(0, minStH_dp - plbHours);
             }
         }
 
@@ -2972,11 +3006,17 @@ function solveDP() {
             const chp = (chpHours >= 24 || (h >= chpStart && h < chpStart + chpHours && chpHours > 0)) ? chpHeatPerH : 0;
             const plb = (plbHours > 0 && h >= plbStartH && h < plbStartH + plbHours)
                 ? (plbHeat / plbHours) : 0;
-            stH = stH + (hourlyExt + intecoH + chp + plb - demandH[h]);
+            // R2: overflow 방지
+            let actualChp = chp;
+            const projected = stH + hourlyExt + intecoH + actualChp + plb - demandH[h];
+            if (projected > storageCap && actualChp > 0) {
+                actualChp = Math.max(0, storageCap - stH - hourlyExt - intecoH - plb + demandH[h]);
+            }
+            stH = stH + (hourlyExt + intecoH + actualChp + plb - demandH[h]);
             if (stH > storageCap) stH = storageCap;
             if (stH < storageMin) stH = storageMin;
-            const chpPowerKWh = (chp > 0) ? perf.powerMW * 1000 : 0;
-            hourly.push({ hour: h, demand: demandH[h], ext: hourlyExt + intecoH, chp, plb, storage: Math.round(stH), smp: smpH[h], mp: d.mpH[h], chpPowerKWh });
+            const chpPowerKWh = (actualChp > 0) ? perf.powerMW * 1000 * (actualChp / (chpHeatPerH || 1)) : 0;
+            hourly.push({ hour: h, demand: demandH[h], ext: hourlyExt + intecoH, chp: actualChp, plb, storage: Math.round(stH), smp: smpH[h], mp: d.mpH[h], chpPowerKWh });
         }
         storageLevel = stH;
 
@@ -4538,7 +4578,7 @@ function _updateDayDetailContent(dayIndex) {
                     const bg = diff === 0 ? '#1a1a1a' : (isCharge ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.15)');
                     const tc = diff === 0 ? '#555' : (isCharge ? '#60a5fa' : '#f87171');
                     const label = diff === 0 ? '·' : (isCharge ? '+' : '') + Math.round(diff);
-                    stHtml += `<div style="flex:1;text-align:center;padding:2px 0;border-radius:3px;background:${bg};font-size:7px;font-weight:600;color:${tc}">${label}</div>`;
+                    stHtml += `<div style="flex:1;text-align:center;padding:3px 0;border-radius:3px;background:${bg};font-size:10px;font-weight:600;color:${tc}">${label}</div>`;
                 }
                 stValsEl.innerHTML = stHtml;
             }
@@ -4553,7 +4593,7 @@ function _updateDayDetailContent(dayIndex) {
                     const v = smpH[h];
                     const bg = v >= 150 ? '#fee2e2' : (v >= 100 ? '#fef3c7' : '#e8f5e9');
                     const tc = v >= 150 ? '#c62828' : (v >= 100 ? '#92400e' : '#2e7d32');
-                    smpHtml += `<div style="flex:1;text-align:center;padding:2px 0;border-radius:3px;background:${bg};font-size:8px;font-weight:600;color:${tc}">${v > 0 ? Math.round(v) : '-'}</div>`;
+                    smpHtml += `<div style="flex:1;text-align:center;padding:3px 0;border-radius:3px;background:${bg};font-size:10px;font-weight:600;color:${tc}">${v > 0 ? Math.round(v) : '-'}</div>`;
                 }
                 smpValsEl.innerHTML = smpHtml;
             }
@@ -4596,17 +4636,17 @@ function showDayDetailModal(simResults, dayIndex) {
     html += '<div id="ddm_chips" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap"></div>';
 
     // 차트
-    html += '<div style="height:400px;margin-bottom:10px"><canvas id="chartDayDetail"></canvas></div>';
+    html += '<div style="height:480px;margin-bottom:10px"><canvas id="chartDayDetail"></canvas></div>';
 
     // 축방열량 배지 행
     html += '<div id="ddm_storageWrap" style="position:relative;margin-top:-2px;display:flex;align-items:center">';
-    html += '<div style="font-size:8px;font-weight:700;color:#64748b;position:absolute;left:0">축방열</div>';
+    html += '<div style="font-size:10px;font-weight:700;color:#64748b;position:absolute;left:0">축방열</div>';
     html += '<div id="ddm_storageVals" style="display:flex;position:relative"></div>';
     html += '</div>';
 
     // SMP 배지 행 (차트 x축에 정렬)
     html += '<div id="ddm_smpWrap" style="position:relative;margin-top:2px;display:flex;align-items:center">';
-    html += '<div id="ddm_smpLabel" style="font-size:8px;font-weight:700;color:#64748b;position:absolute;left:0">SMP</div>';
+    html += '<div id="ddm_smpLabel" style="font-size:10px;font-weight:700;color:#64748b;position:absolute;left:0">SMP</div>';
     html += '<div id="ddm_smpVals" style="display:flex;position:relative"></div>';
     html += '</div>';
 
@@ -4635,11 +4675,12 @@ function showDayDetailModal(simResults, dayIndex) {
         id: 'smpAlign',
         afterDraw(chart) {
             const ca = chart.chartArea;
-            const el = document.getElementById('ddm_smpVals');
-            if (el && ca) {
-                el.style.marginLeft = ca.left + 'px';
-                el.style.width = (ca.right - ca.left) + 'px';
-            }
+            if (!ca) return;
+            const ml = ca.left + 'px', w = (ca.right - ca.left) + 'px';
+            const smp = document.getElementById('ddm_smpVals');
+            const st = document.getElementById('ddm_storageVals');
+            if (smp) { smp.style.marginLeft = ml; smp.style.width = w; }
+            if (st) { st.style.marginLeft = ml; st.style.width = w; }
         }
     };
 
