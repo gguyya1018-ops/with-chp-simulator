@@ -1083,9 +1083,10 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
     transition:all .3s ease; position:relative;
 }
 .wf-step-icon {
-    font-size:22px; filter:grayscale(1) opacity(0.3);
-    transition:all .4s ease;
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    opacity:0.25; transition:all .4s ease;
 }
+.wf-step-icon svg { color:#94a3b8; transition:color .4s ease; }
 .wf-step-label {
     font-size:10px; font-weight:600; color:#475569;
     letter-spacing:-0.01em; transition:color .3s;
@@ -1108,16 +1109,18 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
     background:rgba(59,130,246,0.08);
 }
 .wf-step.active .wf-step-icon {
-    filter:none; transform:scale(1.15);
+    opacity:1; transform:scale(1.15);
     animation:wfBounce 1s ease-in-out infinite;
 }
+.wf-step.active .wf-step-icon svg { color:#60a5fa; }
 .wf-step.active .wf-step-label { color:#93c5fd; }
 .wf-step.active .wf-step-fill { width:60%; background:#3b82f6; }
 .wf-step.active + .wf-conn svg { color:#3b82f6; }
 
 .wf-step.done .wf-step-icon {
-    filter:none; opacity:1;
+    opacity:1;
 }
+.wf-step.done .wf-step-icon svg { color:#4ade80; }
 .wf-step.done .wf-step-label { color:#86efac; }
 .wf-step.done .wf-step-fill { width:100%; background:#22c55e; }
 .wf-step.done + .wf-conn svg { color:#22c55e; }

@@ -3065,14 +3065,15 @@ function runMILPOptimization() {
     const statusEl = document.getElementById('solverStatus');
 
     // ── 워크플로우 오버레이 생성 ──
+    const _si = (d, sz=20) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
     const WORKFLOW_STEPS = [
-        { id: 'wf_data', label: '데이터 준비', icon: '📊' },
-        { id: 'wf_presim', label: '사전검증', icon: '🔍' },
-        { id: 'wf_dp', label: '역방향 탐색', icon: '⚡' },
-        { id: 'wf_decide', label: '결정 추출', icon: '🎯' },
-        { id: 'wf_block', label: '블록 배치', icon: '📐' },
-        { id: 'wf_plb', label: 'PLB 판단', icon: '🔥' },
-        { id: 'wf_sim', label: '시간별 시뮬', icon: '📈' },
+        { id: 'wf_data', label: '데이터 준비', icon: _si('<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>') },
+        { id: 'wf_presim', label: '사전검증', icon: _si('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>') },
+        { id: 'wf_dp', label: '역방향 탐색', icon: _si('<circle cx="12" cy="12" r="10"/><path d="M16 12H8"/><path d="M12 8l-4 4 4 4"/>') },
+        { id: 'wf_decide', label: '결정 추출', icon: _si('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>') },
+        { id: 'wf_block', label: '블록 배치', icon: _si('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>') },
+        { id: 'wf_plb', label: 'PLB 판단', icon: _si('<path d="M12 2v6l3-3"/><path d="M12 8l-3-3"/><circle cx="12" cy="16" r="5"/><path d="M12 13v3h3"/>') },
+        { id: 'wf_sim', label: '시간별 시뮬', icon: _si('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>') },
     ];
 
     let overlay = document.getElementById('wfOverlay');
