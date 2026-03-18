@@ -74,12 +74,43 @@
 
 <nav id="tabNav">
     <span class="nav-title" id="navProjectName">기동계획</span>
-    <button class="tab-btn active" data-tab="tab-data">데이터</button>
-    <button class="tab-btn" data-tab="tab-settings">설정</button>
-    <button class="tab-btn" data-tab="tab-calc">데이터 산출</button>
-    <button class="tab-btn" data-tab="tab-plan">기동계획</button>
-    <button class="tab-btn" data-tab="tab-cost">비용산출</button>
-    <button class="tab-btn" data-tab="tab-result">운영손익</button>
+    <div class="pipeline">
+        <button class="pipe-step active" data-tab="tab-data" data-step="0">
+            <span class="pipe-num"><span class="pipe-num-text">1</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pipe-label">데이터</span>
+            <span class="pipe-status"></span>
+        </button>
+        <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <button class="pipe-step" data-tab="tab-settings" data-step="1">
+            <span class="pipe-num"><span class="pipe-num-text">2</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pipe-label">설정</span>
+            <span class="pipe-status"></span>
+        </button>
+        <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <button class="pipe-step locked" data-tab="tab-calc" data-step="2">
+            <span class="pipe-num"><span class="pipe-num-text">3</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pipe-label">데이터 산출</span>
+            <span class="pipe-status"></span>
+        </button>
+        <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <button class="pipe-step locked" data-tab="tab-plan" data-step="3">
+            <span class="pipe-num"><span class="pipe-num-text">4</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pipe-label">기동계획</span>
+            <span class="pipe-status"></span>
+        </button>
+        <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <button class="pipe-step locked" data-tab="tab-cost" data-step="4">
+            <span class="pipe-num"><span class="pipe-num-text">5</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pipe-label">비용산출</span>
+            <span class="pipe-status"></span>
+        </button>
+        <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <button class="pipe-step locked" data-tab="tab-result" data-step="5">
+            <span class="pipe-num"><span class="pipe-num-text">6</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pipe-label">운영손익</span>
+            <span class="pipe-status"></span>
+        </button>
+    </div>
     <button class="btn-home" onclick="goHome()">홈</button>
 </nav>
 

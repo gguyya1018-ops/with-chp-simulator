@@ -268,6 +268,7 @@ function updateDataStatus() {
     let loaded = 0;
     ALL_DATA_KEYS.forEach(k => { if (DATA[k]) loaded++; });
     document.getElementById('dataStatus').textContent = `${loaded} / ${ALL_DATA_KEYS.length}`;
+    if (typeof checkPipelineStatus === 'function') checkPipelineStatus();
 }
 
 /* ═══════════════════════════════════════════════
@@ -1555,6 +1556,8 @@ function runAllCalc() {
     calculateExternalHeatCost();
     calculateHeatSalesRevenue();
     calculateWaterChem();
+    window._calcDone = true;
+    if (typeof checkPipelineStatus === 'function') checkPipelineStatus();
 }
 
 /* ═══════════════════════════════════════════════
@@ -3077,6 +3080,7 @@ function runMILPOptimization() {
             }
 
             PLAN_RESULTS = simResults;
+            if (typeof checkPipelineStatus === 'function') checkPipelineStatus();
             if (statusEl) statusEl.textContent = `정밀 최적화 완료 (${(elapsed/1000).toFixed(1)}초)`;
 
             const simWrap = document.getElementById('planSimResult');
@@ -5244,6 +5248,7 @@ function runOptimization() {
         return;
     }
     PLAN_RESULTS = simResults;
+    if (typeof checkPipelineStatus === 'function') checkPipelineStatus();
 
     // 시뮬 결과 영역 표시
     const simWrap = document.getElementById('planSimResult');
@@ -5555,10 +5560,79 @@ function _switchLogicTab(tab) {
    탭 전환 이벤트
    ═══════════════════════════════════════════════ */
 
-// 메인 탭
-document.querySelectorAll('.tab-btn').forEach(btn => {
+// ═══ 파이프라인 상태 관리 ═══
+const PIPE_STEPS = document.querySelectorAll('.pipe-step');
+const PIPE_ARROWS = document.querySelectorAll('.pipe-arrow');
+
+// 필수 데이터 키 (이것만 있으면 시뮬 가능)
+const REQUIRED_DATA = ['smp_hourly', 'operations_daily', 'ng_price_monthly', 'cp_monthly'];
+// 필수 설정 (값이 0이 아닌지)
+const REQUIRED_SETTINGS = ['chpCapacity', 'storageCapacity'];
+
+function checkPipelineStatus() {
+    // Step 0: 데이터 — 필수 데이터 입력 여부
+    const dataLoaded = REQUIRED_DATA.filter(k => DATA[k] && DATA[k].rows && DATA[k].rows.length > 0).length;
+    const dataTotal = REQUIRED_DATA.length;
+    const dataDone = dataLoaded >= dataTotal;
+
+    // Step 1: 설정 — 주요 설정값 존재 여부
+    const settingsOk = REQUIRED_SETTINGS.every(id => {
+        const el = document.getElementById(id);
+        return el && parseFloat(el.value) > 0;
+    });
+
+    // Step 2: 데이터 산출 — 데이터+설정 충족 시 ready, CALC_DONE 시 done
+    const calcReady = dataDone && settingsOk;
+    const calcDone = !!window._calcDone;
+
+    // Step 3: 기동계획 — 데이터 산출 완료 시 ready, PLAN_RESULTS 있으면 done
+    const planReady = calcDone;
+    const planDone = !!PLAN_RESULTS;
+
+    // Step 4: 비용산출 — 기동계획 완료 시 ready/done
+    const costReady = planDone;
+    const costDone = planDone;
+
+    // Step 5: 운영손익 — 비용산출과 동일
+    const resultReady = planDone;
+    const resultDone = planDone;
+
+    const states = [
+        { done: dataDone, ready: true, status: dataDone ? '완료' : `${dataLoaded}/${dataTotal}` },
+        { done: settingsOk, ready: true, status: settingsOk ? '완료' : '미설정' },
+        { done: calcDone, ready: calcReady, status: calcDone ? '완료' : calcReady ? '준비됨' : '대기' },
+        { done: planDone, ready: planReady, status: planDone ? '완료' : planReady ? '준비됨' : '대기' },
+        { done: costDone, ready: costReady, status: costDone ? '완료' : '대기' },
+        { done: resultDone, ready: resultReady, status: resultDone ? '완료' : '대기' },
+    ];
+
+    PIPE_STEPS.forEach((step, i) => {
+        const s = states[i];
+        step.classList.remove('locked', 'ready', 'done');
+        if (s.done) step.classList.add('done');
+        else if (s.ready) step.classList.add('ready');
+        else step.classList.add('locked');
+
+        const statusEl = step.querySelector('.pipe-status');
+        if (statusEl) {
+            statusEl.textContent = s.status;
+            statusEl.style.display = (s.status && s.status !== '대기') ? 'inline-block' : 'none';
+        }
+    });
+
+    // 화살표 상태
+    PIPE_ARROWS.forEach((arrow, i) => {
+        arrow.classList.remove('lit', 'active');
+        if (states[i] && states[i].done) arrow.classList.add('lit');
+        else if (states[i] && states[i].ready) arrow.classList.add('active');
+    });
+}
+
+// 메인 탭 전환
+document.querySelectorAll('.pipe-step').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        if (btn.classList.contains('locked')) return; // 잠긴 탭 클릭 불가
+        document.querySelectorAll('.pipe-step').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(btn.dataset.tab).classList.add('active');
@@ -5566,7 +5640,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         if (btn.dataset.tab === 'tab-calc') {
             runAllCalc();
         }
-        // 운영손익 탭 진입 시 차트 리렌더 (display:none→block 후 width 확보)
+        // 운영손익 탭 진입 시 차트 리렌더
         if (btn.dataset.tab === 'tab-result' && PLAN_RESULTS) {
             requestAnimationFrame(() => renderContribution(PLAN_RESULTS));
         }
@@ -5685,7 +5759,7 @@ document.querySelectorAll('.step-btn').forEach(btn => {
     });
 
     // 설정 탭 진입 시 스냅샷 갱신
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('.pipe-step').forEach(btn => {
         btn.addEventListener('click', () => {
             if (btn.dataset.tab === 'tab-settings') setTimeout(takeSnapshot, 50);
         });

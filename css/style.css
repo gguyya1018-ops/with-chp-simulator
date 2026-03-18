@@ -415,31 +415,124 @@ td[style*="position:sticky"] {
 
 /* ═══ 네비게이션 ═══ */
 #tabNav {
-    display:flex; align-items:center; gap:2px;
-    background:var(--bg-card); padding:0 20px; height:48px;
+    display:flex; align-items:center; gap:0;
+    background:var(--bg-card); padding:0 16px; height:54px;
     border-bottom:1px solid var(--border-default);
 }
 .nav-title {
-    color:transparent; font-size:14px; font-weight:800; margin-right:24px;
+    color:transparent; font-size:14px; font-weight:800; margin-right:20px;
     letter-spacing:-0.02em; position:relative; padding-left:22px;
     background:linear-gradient(135deg, #7BA8F5 0%, #A78BFA 50%, #4B83F0 100%);
-    -webkit-background-clip:text; background-clip:text;
+    -webkit-background-clip:text; background-clip:text; flex-shrink:0;
 }
 .nav-title::before {
     content:'📋'; position:absolute; left:0; top:50%; transform:translateY(-50%);
     font-size:13px; filter:grayscale(.3);
 }
-.tab-btn {
-    background:transparent; color:var(--text-faint); border:none;
-    padding:12px 18px; font-size:12px; font-weight:500; cursor:pointer;
-    border-bottom:2px solid transparent; transition:.2s; letter-spacing:-0.01em;
+
+/* ── 파이프라인 스텝 ── */
+.pipeline { display:flex; align-items:center; gap:0; flex:1; min-width:0; }
+
+.pipe-step {
+    display:flex; align-items:center; gap:7px; padding:6px 14px;
+    background:transparent; border:1px solid transparent; border-radius:8px;
+    cursor:pointer; transition:all .3s ease; position:relative; white-space:nowrap;
 }
-.tab-btn:hover { color:#d4d4d4; }
-.tab-btn.active { color:#fff; border-bottom-color:var(--accent); font-weight:600; }
+.pipe-step:hover { background:rgba(255,255,255,0.04); }
+.pipe-step.active {
+    background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.3);
+}
+
+/* 번호 원형 */
+.pipe-num {
+    width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; flex-shrink:0; position:relative;
+    background:rgba(255,255,255,0.06); color:#64748b; border:1.5px solid #334155;
+    transition:all .4s ease;
+}
+.pipe-num-text { transition:all .3s ease; }
+.pipe-check { display:none; width:14px; height:14px; }
+
+/* 라벨 + 상태 */
+.pipe-label {
+    font-size:12px; font-weight:500; color:#64748b; transition:all .3s ease;
+    letter-spacing:-0.01em;
+}
+.pipe-status {
+    font-size:9px; font-weight:600; padding:1px 6px; border-radius:3px;
+    display:none; letter-spacing:0.02em; transition:all .3s ease;
+}
+
+/* 화살표 */
+.pipe-arrow {
+    display:flex; align-items:center; padding:0 2px; flex-shrink:0;
+}
+.pipe-arrow svg { width:18px; height:10px; color:#334155; transition:color .4s ease; }
+
+/* ── 상태별 스타일 ── */
+
+/* locked: 비활성 */
+.pipe-step.locked { cursor:default; opacity:0.5; }
+.pipe-step.locked .pipe-label { color:#475569; }
+
+/* ready: 진행 가능 (글로우) */
+.pipe-step.ready .pipe-num {
+    background:rgba(59,130,246,0.15); border-color:#3b82f6; color:#60a5fa;
+    box-shadow:0 0 8px rgba(59,130,246,0.3);
+    animation:pulseReady 2s ease-in-out infinite;
+}
+.pipe-step.ready .pipe-label { color:#93c5fd; }
+.pipe-step.ready .pipe-status {
+    display:inline-block; background:rgba(59,130,246,0.15); color:#60a5fa;
+}
+
+/* active: 현재 보고 있는 탭 */
+.pipe-step.active .pipe-num {
+    background:rgba(59,130,246,0.2); border-color:#3b82f6; color:#fff;
+}
+.pipe-step.active .pipe-label { color:#fff; font-weight:600; }
+
+/* done: 완료 */
+.pipe-step.done .pipe-num {
+    background:rgba(34,197,94,0.15); border-color:#22c55e; color:#4ade80;
+}
+.pipe-step.done .pipe-num-text { display:none; }
+.pipe-step.done .pipe-check { display:block; color:#4ade80; }
+.pipe-step.done .pipe-label { color:#86efac; }
+.pipe-step.done .pipe-status {
+    display:inline-block; background:rgba(34,197,94,0.12); color:#4ade80;
+}
+
+/* active + done 조합 */
+.pipe-step.active.done .pipe-num {
+    background:rgba(34,197,94,0.2); border-color:#22c55e; color:#fff;
+    box-shadow:0 0 8px rgba(34,197,94,0.25);
+}
+.pipe-step.active.done .pipe-check { color:#fff; }
+.pipe-step.active.done .pipe-label { color:#fff; }
+
+/* active + ready 조합 */
+.pipe-step.active.ready .pipe-num {
+    background:rgba(59,130,246,0.25); border-color:#60a5fa; color:#fff;
+    box-shadow:0 0 10px rgba(59,130,246,0.35);
+    animation:none;
+}
+.pipe-step.active.ready .pipe-label { color:#fff; }
+
+/* 화살표: done 이후 색상 */
+.pipe-arrow.lit svg { color:#22c55e; }
+.pipe-arrow.active svg { color:#3b82f6; }
+
+@keyframes pulseReady {
+    0%, 100% { box-shadow:0 0 6px rgba(59,130,246,0.2); }
+    50% { box-shadow:0 0 14px rgba(59,130,246,0.45); }
+}
+
+/* 홈 버튼 */
 .btn-home {
     margin-left:auto; background:var(--border-default); color:var(--text-tertiary); border:1px solid var(--border-strong);
     padding:6px 14px; border-radius:4px; font-size:11px; cursor:pointer;
-    transition:.15s;
+    transition:.15s; flex-shrink:0;
 }
 .btn-home:hover { background:var(--border-strong); color:#ededed; }
 
