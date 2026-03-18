@@ -5976,8 +5976,8 @@ const PIPE_ARROWS = document.querySelectorAll('.pipe-arrow');
 
 // 필수 데이터 키 (이것만 있으면 시뮬 가능)
 const REQUIRED_DATA = ['smp_hourly', 'operations_daily', 'ng_price_monthly', 'cp_monthly'];
-// 필수 설정 (값이 0이 아닌지)
-const REQUIRED_SETTINGS = ['chpCapacity', 'storageCapacity'];
+// 필수 설정 (값이 0이 아닌지) — 모두 기본값 있음, 정비일정 등은 선택
+const REQUIRED_SETTINGS = ['storageCapacity'];
 
 function checkPipelineStatus() {
     // Step 0: 데이터 — 필수 데이터 입력 여부
