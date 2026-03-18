@@ -5597,7 +5597,7 @@ function renderDailyChart(simResults, month) {
             data: {
                 labels,
                 datasets: [
-                    { label: '수요량', data: rows.map(r => Math.round(r.demand)), backgroundColor: '#e2e8f0', stack: 'demand', order: 1 },
+                    { label: '수요량', data: rows.map(r => Math.round(r.demand)), backgroundColor: 'rgba(148,163,184,0.35)', borderColor: 'rgba(148,163,184,0.5)', borderWidth: 1, stack: 'demand', order: 1 },
                     { label: 'CHP열', data: rows.map(r => Math.round(r.chpHeat)), backgroundColor: '#3b82f6', stack: 'prod', order: 0 },
                     { label: 'PLB열', data: rows.map(r => Math.round(r.plbHeat)), backgroundColor: '#f59e0b', stack: 'prod', order: 0 },
                     { label: '축열조', data: rows.map(r => Math.round(r.storageLevel)), borderColor: '#6366f1', borderWidth: 1.5, type: 'line', pointRadius: 2, stack: false, yAxisID: 'y1', order: -1 },
