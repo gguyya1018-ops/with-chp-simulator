@@ -603,10 +603,10 @@
 <div class="tab-content" id="tab-plan">
     <div class="section-bar">
         <span class="section-title">기동계획</span>
-        <div class="plan-btn-group" id="planBtnGroup">
-            <button class="plan-btn plan-btn--left active" onclick="document.querySelectorAll('#planBtnGroup .plan-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');runOptimization()" title="빠르게 계산합니다 (1초 미만)">기본 최적화</button>
-            <button class="plan-btn plan-btn--right" onclick="document.querySelectorAll('#planBtnGroup .plan-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');runMILPOptimization()" title="더 정확한 최적 조합을 찾습니다 (수초 소요)">정밀 최적화</button>
-        </div>
+        <button class="run-optim-btn" onclick="runMILPOptimization()" id="btnRunOptim">
+            <svg class="run-optim-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            최적화 실행
+        </button>
         <button class="plan-btn plan-btn--ghost" onclick="showLogicFlowModal()" id="btnShowLogicFlow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;opacity:.7"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>로직 흐름</button>
         <span id="solverStatus" class="solver-status"></span>
     </div>

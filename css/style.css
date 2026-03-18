@@ -559,27 +559,41 @@ td[style*="position:sticky"] {
 .btn-sm:hover { background:var(--border-default); color:#ededed; }
 .section-bar .btn-sm:first-of-type { margin-left:auto; }
 
-/* ═══ 기동계획 버튼 그룹 ═══ */
-.plan-btn-group {
-    display:inline-flex; gap:6px;
+/* ═══ 최적화 실행 버튼 ═══ */
+.run-optim-btn {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 28px; font-size:13px; font-weight:700; letter-spacing:0.02em;
+    color:#fff; border:none; border-radius:10px; cursor:pointer;
+    background:linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
+    box-shadow:0 4px 16px rgba(59,130,246,0.3), 0 0 0 1px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.1);
+    transition:all .25s ease; position:relative; overflow:hidden;
 }
-.plan-btn {
-    border:1px solid #333; padding:8px 18px; font-size:12px; font-weight:500;
-    cursor:pointer; transition:all .2s ease; letter-spacing:-0.01em;
-    background:#141414; color:#999; border-radius:8px;
+.run-optim-btn::before {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+    transform:translateX(-100%);
+    animation:btnShimmer 3s ease-in-out infinite;
 }
-.plan-btn--left, .plan-btn--right { border-radius:8px; }
-/* 비활성 호버 */
-.plan-btn:not(.active):hover { background:#1a1a1a; color:#e0e0e0; border-color:#444; }
-/* 활성 상태 */
-.plan-btn.active {
-    background:#1a1a1a; color:#f0f0f0; border-color:var(--accent);
-    box-shadow:0 0 0 1px rgba(75,131,240,.15); font-weight:500;
+@keyframes btnShimmer {
+    0% { transform:translateX(-100%); }
+    40%, 100% { transform:translateX(100%); }
 }
+.run-optim-btn:hover {
+    transform:translateY(-2px);
+    box-shadow:0 6px 24px rgba(59,130,246,0.4), 0 0 0 1px rgba(99,102,241,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+    filter:brightness(1.1);
+}
+.run-optim-btn:active {
+    transform:translateY(0);
+    box-shadow:0 2px 8px rgba(59,130,246,0.25);
+    filter:brightness(0.95);
+}
+.run-optim-icon { width:16px; height:16px; flex-shrink:0; }
+
 .plan-btn--ghost {
     background:#141414; color:#999; border:1px solid #333;
     border-radius:8px; padding:8px 18px; font-size:12px; font-weight:500;
-    transition:all .2s ease;
+    cursor:pointer; transition:all .2s ease;
 }
 .plan-btn--ghost:hover { background:#1a1a1a; color:#e0e0e0; border-color:#444; }
 .solver-status { font-size:12px; color:#b0b0b0; margin-left:8px; letter-spacing:0.02em; }
