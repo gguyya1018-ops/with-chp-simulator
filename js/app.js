@@ -3072,7 +3072,7 @@ function runMILPOptimization() {
         { id: 'wf_dp', label: '역방향 탐색', icon: _si('<circle cx="12" cy="12" r="10"/><path d="M16 12H8"/><path d="M12 8l-4 4 4 4"/>') },
         { id: 'wf_decide', label: '결정 추출', icon: _si('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>') },
         { id: 'wf_block', label: '블록 배치', icon: _si('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>') },
-        { id: 'wf_plb', label: 'PLB 판단', icon: _si('<path d="M12 2v6l3-3"/><path d="M12 8l-3-3"/><circle cx="12" cy="16" r="5"/><path d="M12 13v3h3"/>') },
+        { id: 'wf_plb', label: 'PLB 판단', icon: _si('<path d="M5 20v-8a7 7 0 0 1 14 0v8"/><path d="M3 20h18"/><path d="M12 4V2"/><path d="M9 8l-2-2"/><path d="M15 8l2-2"/><circle cx="12" cy="14" r="2"/><path d="M12 16v4"/>') },
         { id: 'wf_sim', label: '시간별 시뮬', icon: _si('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>') },
     ];
 
