@@ -473,7 +473,7 @@ td[style*="position:sticky"] {
 /* ── 상태별 스타일 ── */
 
 /* locked */
-.pipe-step.locked { cursor:default; opacity:0.35; border-color:transparent; }
+.pipe-step.locked { cursor:default; opacity:1; border-color:#333; }
 
 /* ready */
 .pipe-step.ready { border-color:rgba(59,130,246,0.15); }
@@ -1089,14 +1089,15 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
     display:flex; flex-direction:column; align-items:center; gap:6px;
     padding:10px 8px; border-radius:10px; min-width:72px;
     transition:all .3s ease; position:relative;
+    border:1px solid #444; background:#1a1a1a;
 }
 .wf-step-icon {
     width:28px; height:28px; display:flex; align-items:center; justify-content:center;
-    opacity:0.5; transition:all .4s ease;
+    opacity:1; transition:all .4s ease;
 }
-.wf-step-icon svg { color:#94a3b8; transition:color .4s ease; }
+.wf-step-icon svg { color:#999; transition:color .4s ease; }
 .wf-step-label {
-    font-size:10px; font-weight:600; color:#8892a4;
+    font-size:11px; font-weight:600; color:#ccc;
     letter-spacing:-0.01em; transition:color .3s;
 }
 .wf-step-bar {
@@ -1110,11 +1111,11 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
 
 /* 커넥터 화살표 */
 .wf-conn { display:flex; align-items:center; padding:0 2px; margin-bottom:18px; }
-.wf-conn svg { width:20px; height:8px; color:#5a6478; transition:color .3s; }
+.wf-conn svg { width:20px; height:8px; color:#999; transition:color .3s; }
 
 /* 스텝 상태 */
 .wf-step.active {
-    background:rgba(59,130,246,0.08);
+    background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.4);
 }
 .wf-step.active .wf-step-icon {
     opacity:1; transform:scale(1.15);
@@ -1125,6 +1126,9 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
 .wf-step.active .wf-step-fill { width:60%; background:#3b82f6; }
 .wf-step.active + .wf-conn svg { color:#3b82f6; }
 
+.wf-step.done {
+    background:rgba(34,197,94,0.06); border-color:rgba(34,197,94,0.3);
+}
 .wf-step.done .wf-step-icon {
     opacity:1;
 }
