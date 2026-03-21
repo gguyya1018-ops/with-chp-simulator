@@ -3,6 +3,14 @@
  * Phase 2 - 최적운전 계획 수립
  */
 
+/* ── F5 / Ctrl+R : 페이지 새로고침 (JS/CSS 변경 반영) ── */
+document.addEventListener('keydown', e => {
+    if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+        e.preventDefault();
+        location.reload();
+    }
+});
+
 /* ═══════════════════════════════════════════════
    커스텀 타이틀바 (frameless)
    ═══════════════════════════════════════════════ */
@@ -58,7 +66,7 @@ const TEMPLATES = {
     water_chem_daily:   { type:'daily', headers:['월','일','용수사용량(㎥)','가성소다(Kg)','탈산소제(Kg)','암모니아수(Kg)','염산(Kg)','카보하이드라자이드(Kg)','PH조절제(Kg)'] },
     holidays:           { type:'daily', headers:['month','day','weekday','is_holiday'] },
     cp_monthly:         { type:'monthly', headers:['월','평일CP','휴일CP','TLF(평일)','TLF(토요일)','TLF(공휴일)'] },
-    ng_price_monthly:   { type:'monthly', headers:['월','NG단위열량','안전관리부담금(원/N㎥)','석유수입부과금(원/MJ)','CHP열량단가(원/MJ)','PLB열량단가(원/MJ)'] },
+    ng_price_monthly:   { type:'monthly', headers:['월','NG단위열량','안전관리부담금(원/N㎥)','석유수입부과금(원/MJ)','CHP열량단가(원/MJ)','PLB열량단가(원/MJ)','FC열량단가(원/MJ)'] },
     base_charge_monthly:{ type:'monthly', headers:['월','기본료(154kV)','기본료(22kV)','기후환경요금계수(원/kWh)','연료비조정계수(원/kWh)','전력기금(%)'] },
     elec_rate_weekday:  { type:'monthly_hours', headers:['hour','m1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12'] },
     elec_rate_saturday: { type:'monthly_hours', headers:['hour','m1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12'] },
@@ -397,8 +405,10 @@ function renderEditableMonthly(key) {
         { type:'data', idx:3, label:'석유수입부과금(원/MJ)' },
         { type:'data', idx:4, label:'CHP열량단가(원/MJ)' },
         { type:'data', idx:5, label:'PLB열량단가(원/MJ)' },
+        { type:'data', idx:6, label:'FC열량단가(원/MJ)' },
         { type:'calc', label:'CHP단가(원/N㎥)' },
         { type:'calc', label:'PLB단가(원/N㎥)' },
+        { type:'calc', label:'FC단가(원/N㎥)' },
     ] : null;
 
     const customCols = heatColOrder || ngColOrder;
@@ -437,6 +447,7 @@ function renderEditableMonthly(key) {
             const D = row ? (Number(row[3]) || 0) : 0;
             const E = row ? (Number(row[4]) || 0) : 0;
             const F = row ? (Number(row[5]) || 0) : 0;
+            const G = row ? (Number(row[6]) || 0) : 0;
             ngColOrder.forEach(col => {
                 if (col.type === 'data' && col.idx === 0) {
                     html += `<td>${row ? row[0] : i + 1}</td>`;
@@ -449,6 +460,9 @@ function renderEditableMonthly(key) {
                 } else if (col.label === 'PLB단가(원/N㎥)') {
                     const plb = Math.round((B * F) * 100) / 100;
                     html += `<td class="calc-col">${plb.toLocaleString()}</td>`;
+                } else if (col.label === 'FC단가(원/N㎥)') {
+                    const fc = Math.round((B * G) * 100) / 100;
+                    html += `<td class="calc-col">${fc.toLocaleString()}</td>`;
                 }
             });
         } else {
@@ -510,10 +524,12 @@ function updateNgPriceCalcCols() {
         const D = Number(tr.querySelector('input[data-c="3"]')?.value) || 0;
         const E = Number(tr.querySelector('input[data-c="4"]')?.value) || 0;
         const F = Number(tr.querySelector('input[data-c="5"]')?.value) || 0;
+        const G = Number(tr.querySelector('input[data-c="6"]')?.value) || 0;
         const calcTds = tr.querySelectorAll('td.calc-col');
-        if (calcTds.length >= 2) {
+        if (calcTds.length >= 3) {
             calcTds[0].textContent = (Math.round((B * (E - D) - C) * 100) / 100).toLocaleString();
             calcTds[1].textContent = (Math.round((B * F) * 100) / 100).toLocaleString();
+            calcTds[2].textContent = (Math.round((B * G) * 100) / 100).toLocaleString();
         }
     });
 }
@@ -721,7 +737,7 @@ async function downloadExcel() {
 const SETTINGS_IDS = [
     'chpMinRunHours', 'chpMinStopHours', 'chpMinLoad', 'plbCount', 'plbAuxCost', 'plbMinRunHours',
     'storageCapacity', 'storageInitial', 'storageChargeRate', 'storageDischargeRate', 'storageMinLevel', 'plbRecoveryTarget',
-    'hotTime', 'hotGasRate', 'warmTime', 'warmGasRate', 'coldTime', 'coldGasRate',
+    'hotGasTotal', 'warmGasTotal', 'coldGasTotal',
     'mt1StartM', 'mt1StartD', 'mt1EndM', 'mt1EndD',
     'mt2StartM', 'mt2StartD', 'mt2EndM', 'mt2EndD',
     'mt3StartM', 'mt3StartD', 'mt3EndM', 'mt3EndD',
@@ -2435,6 +2451,8 @@ function runDailySimulation() {
                 chpFuelCost: 0, chpElecRev: 0, chpNetCost: 0, startupCost: 0,
                 plbFuelCost, totalFuelCost: plbFuelCost, totalNetCost: plbFuelCost,
                 chpCostPerGcal: 0, plbCostPerGcal: Math.round(d.plbCostPerGcal),
+                plbRefCostPerGcal: Math.round(d.plbCostPerGcal),
+                ngCostNm3: d.ngCostNm3,
                 dayType: '정비',
             });
             prevChpOn = false;
@@ -2596,6 +2614,8 @@ function runDailySimulation() {
         // CHP 연속 블록: SMP 최대 + overflow 완전 거부 (R2) + 일간 연속성
         let chpStart = 0;
         if (chpHours > 0 && chpHours < 24) {
+            // PLB 단가: underflow 시 실제 PLB 비용을 시작시각 점수에 반영
+            const plbPenaltyPerGcal = d.plbCostPerGcal || 200;
             let bestScore = -Infinity;
             // overflow 없는 배치를 우선 탐색, 없으면 CHP 시간 축소
             let tryHours = chpHours;
@@ -2614,7 +2634,7 @@ function runDailySimulation() {
                         if (h >= s && h < s + tryHours) smpSum += d.mpH[h];
                     }
                     if (overflow > 0) continue; // R2: overflow 배치 완전 거부
-                    const score = smpSum - underflow * 200;
+                    const score = smpSum - underflow * plbPenaltyPerGcal;
                     if (score > bestScore) { bestScore = score; chpStart = s; chpHours = tryHours; }
                 }
                 if (bestScore > -Infinity) break; // overflow 없는 배치 찾음
@@ -2735,6 +2755,8 @@ function runDailySimulation() {
             totalNetCost: chpNetCost + plbFuelCost + startupCost,
             chpCostPerGcal,
             plbCostPerGcal: Math.round(d.plbCostPerGcal),
+            plbRefCostPerGcal: Math.round(d.plbCostPerGcal),
+            ngCostNm3: d.ngCostNm3,
             dayType: d.isMaint ? '정비' : (d.isHoliday ? '공휴일' : (d.isWeekend ? '주말' : '평일')),
         });
 
@@ -2943,6 +2965,8 @@ function solveDP() {
         const demandH = d.demandH;
 
         // ═══ 2단계: CHP 연속 블록 배치 (R2: overflow 완전 거부) ═══
+        // PLB 단가: underflow 시 실제 PLB 비용을 시작시각 점수에 반영
+        const plbPenaltyPerGcal = d.plbCostPerGcal || 200;
         let chpStart = 0;
         if (chpHours > 0 && chpHours < 24) {
             let bestScore = -Infinity;
@@ -2962,7 +2986,7 @@ function solveDP() {
                         if (h >= s && h < s + tryHours) smpSum += d.mpH[h];
                     }
                     if (overflow > 0) continue;
-                    const score = smpSum - underflow * 200;
+                    const score = smpSum - underflow * plbPenaltyPerGcal;
                     if (score > bestScore) { bestScore = score; chpStart = s; chpHours = tryHours; }
                 }
                 if (bestScore > -Infinity) break;
@@ -3049,6 +3073,8 @@ function solveDP() {
             totalNetCost: chpNetCost + plbFuelCost + startupCost,
             chpCostPerGcal,
             plbCostPerGcal: Math.round(d.plbCostPerGcal),
+            plbRefCostPerGcal: Math.round(d.plbCostPerGcal),
+            ngCostNm3: d.ngCostNm3,
             dayType: d.isMaint ? '정비' : (d.isHoliday ? '공휴일' : (d.isWeekend ? '주말' : '평일')),
         });
 
@@ -3190,24 +3216,83 @@ function runMILPOptimization() {
 // ─── 비동기 MPC 래퍼: UI 업데이트를 위한 yield ───
 async function solveMPCAsync(horizon, onProgress) {
     return new Promise((resolve) => {
-        // 동기 MPC를 청크 단위로 실행
-        const ctx = solveMPCInit(horizon);
+        // 블록화된 solveMPC를 청크 단위로 실행
+        const ctx = _mpcInit(horizon);
         if (!ctx) { resolve(null); return; }
+        if (onProgress) onProgress(0, 0, 'wf_data');
 
         let today = 0;
         const N = ctx.N;
+        const NUM_STOP = ctx.NUM_STOP;
 
         function runChunk() {
-            const chunkEnd = Math.min(today + 5, N); // 5일씩 처리
+            const chunkEnd = Math.min(today + 1, N); // 1일씩 처리 (부드러운 진행)
             while (today < chunkEnd) {
-                solveMPCDay(ctx, today, onProgress);
+                // ── 최적 탐색: 시간+시작시각+부하를 한번에 결정 ──
+                const dpResult = _mpcRunDP(ctx, today);
+
+                // ── 결정 추출: 현재 상태에서 최적 결정 꺼냄 ──
+                const decision = _mpcExtractDecision(ctx, today, dpResult);
+
+                // Block 3 불필요: 최적 탐색이 시작시각까지 결정함
+                const block = { chpStart: decision.chpStart, chpHours: decision.chpHours };
+
+                // ── PLB 판단: 축열조 부족 시 보조보일러 투입 ──
+                const plb = _mpcDecidePLB(ctx, today, block, decision.chpHeatPerH);
+
+                // ── 시간별 시뮬: 24시간 에너지 밸런스 검증 ──
+                const sim = _mpcSimulate24h(ctx, today, block, plb, decision);
+
+                // ── 검증: 제약조건 위반 체크 ──
+                const warns = _mpcValidate(ctx, today, block, sim);
+                if (warns.length > 0) ctx._warnings.push(...warns);
+
+                // ── 비용 집계 ──
+                const result = _mpcSummarize(ctx, today, decision, block, plb, sim);
+
+                // 상태 갱신 (다음날로 전달)
+                ctx.storageLevel = sim.finalStorage;
+                ctx.prevChpOn    = block.chpHours > 0;
+                ctx.prevChpEndH  = block.chpHours > 0 ? block.chpStart + block.chpHours : ctx.prevChpEndH;
+                if (block.chpHours > 0) ctx.heurStopDays = 0; else ctx.heurStopDays++;
+
+                // 정지레벨 갱신
+                if (block.chpHours <= 0) {
+                    ctx.sk = Math.min(ctx.sk + 1, ctx.NUM_STOP - 1);
+                } else if (block.chpStart + block.chpHours >= 24) {
+                    ctx.sk = 0;
+                } else {
+                    ctx.sk = 1;
+                }
+
+                ctx.results.push(result);
                 today++;
             }
             if (today < N) {
-                if (onProgress) onProgress(Math.round(today / N * 100), today, null);
-                requestAnimationFrame(runChunk); // UI 갱신 틈
+                // 청크 사이에서 현재 진행 단계를 순차 표시
+                const p = Math.round(today / N * 100);
+                const phases = ['wf_presim','wf_dp','wf_decide','wf_block','wf_plb','wf_sim'];
+                const phaseIdx = Math.floor((today / N) * phases.length) % phases.length;
+                if (onProgress) onProgress(p, today, phases[phaseIdx]);
+                setTimeout(runChunk, 0); // UI 갱신 (최소 딜레이)
             } else {
                 if (onProgress) onProgress(100, N, 'wf_sim');
+                // 검증 결과 출력
+                if (ctx._warnings.length > 0) {
+                    console.warn(`[MPC 검증] ${ctx._warnings.length}건의 제약 위반 발견:`);
+                    const grouped = {};
+                    ctx._warnings.forEach(w => {
+                        if (!grouped[w.type]) grouped[w.type] = [];
+                        grouped[w.type].push(w);
+                    });
+                    Object.entries(grouped).forEach(([type, items]) => {
+                        console.warn(`  ${type} (${items.length}건): ${items.slice(0, 5).map(w => `${w.day} ${w.msg}`).join(' | ')}${items.length > 5 ? ` ... 외 ${items.length - 5}건` : ''}`);
+                    });
+                } else {
+                    console.log('[MPC 검증] 제약 위반 없음 ✓');
+                }
+                // 결과에 경고 첨부
+                ctx.results._warnings = ctx._warnings;
                 resolve(ctx.results);
             }
         }
@@ -3401,6 +3486,8 @@ function solveMPCDay(ctx, today, onProgress) {
     const smpH = d.smpH || Array(24).fill(d.smpAvg);
     let chpStart = 0;
     if (chpHours > 0 && chpHours < 24) {
+        // PLB 단가: underflow 시 실제 PLB 비용을 시작시각 점수에 반영
+        const plbPenaltyPerGcal = d.plbCostPerGcal || 200;
         let bestScore = -Infinity, tryHours = chpHours;
         while (tryHours >= minRunTime) {
             bestScore = -Infinity;
@@ -3416,7 +3503,8 @@ function solveMPCDay(ctx, today, onProgress) {
                     if (h >= s && h < s + tryHours) smpSum += d.mpH[h];
                 }
                 if (overflow > 0) continue;
-                const score = smpSum - underflow * 200;
+                // MP 수익에서 PLB 실비용을 차감 → PLB가 필요한 시작시각은 불이익
+                const score = smpSum - underflow * plbPenaltyPerGcal;
                 if (score > bestScore) { bestScore = score; chpStart = s; chpHours = tryHours; }
             }
             if (bestScore > -Infinity) break;
@@ -3504,54 +3592,76 @@ function solveMPCDay(ctx, today, onProgress) {
         plbFuelCost, totalFuelCost: chpFuelCost + plbFuelCost + startupCost,
         totalNetCost: chpNetCost + plbFuelCost + startupCost,
         chpCostPerGcal, plbCostPerGcal: plbHeat > 0 ? Math.round(plbFuelCost / plbHeat) : 0,
+        plbRefCostPerGcal: Math.round(d.plbCostPerGcal),
+        ngCostNm3: d.ngCostNm3,
         dayType: d.isMaint ? '정비' : (d.isHoliday ? '공휴일' : (d.isWeekend ? '주말' : '평일')),
     });
 }
 
 // ─── MPC 솔버: 매일 DP(horizon일 앞) + 1일 실제실행 반복 (동기 버전 - 기본 최적화용) ───
-function solveMPC(horizon, onProgress) {
+// ═══════════════════════════════════════════════════════════════
+// MPC 최적화 엔진 — 블록별 함수 구조
+// ═══════════════════════════════════════════════════════════════
+//
+//  solveMPC(horizon, onProgress)          ← 진입점 (아래 블록들을 순서대로 호출)
+//    │
+//    ├─ Block 0: _mpcInit()               ← 설정 로드, 상태공간 정의, 비용 사전계산
+//    │
+//    └─ for (매일 반복) {
+//         ├─ Block 1: _mpcRunDP()         ← 역방향 DP (30일 윈도우)
+//         ├─ Block 2: _mpcExtractDecision()← 오늘의 최적 결정 추출
+//         ├─ Block 3: _mpcPlaceBlock()    ← CHP 블록 배치 (SMP 최대 시간대)
+//         ├─ Block 4: _mpcDecidePLB()     ← PLB 투입 판단
+//         ├─ Block 5: _mpcSimulate24h()   ← 시간별 시뮬레이션
+//         └─ Block 6: _mpcSummarize()     ← 일별 비용 집계
+//       }
+//
+// ═══════════════════════════════════════════════════════════════
+
+
+// ─── Block 0: 초기화 ───
+// 설정값 로드, 상태공간 정의, 일별 비용 사전계산
+// 입력: horizon (탐색 범위 일수)
+// 출력: ctx 객체 (모든 블록이 공유하는 컨텍스트)
+function _mpcInit(horizon) {
     const days = buildDailyData();
     if (!days || days.length === 0) return null;
 
-    // 설정값 (solveDP와 동일)
+    // 설정값
     const chpLoadTable = getChpLoadTable();
-    const plbCount = parseInt(document.getElementById('plbCount')?.value) || 3;
-    const plbTable = getPlbLoadTable();
-    const plbMaxCap = plbTable.length > 0 ? plbTable[0].열Gcal : 68.8;
-    const storageCap = parseFloat(document.getElementById('storageCapacity')?.value) || 1500;
-    const storageInit = parseFloat(document.getElementById('storageInitial')?.value) || 750;
-    const storageMin = parseFloat(document.getElementById('storageMinLevel')?.value) || 100;
-    const minRunTime = parseFloat(document.getElementById('chpMinRunHours')?.value) || 4;
-    const minStopTime = parseFloat(document.getElementById('chpMinStopHours')?.value) || 4;
-    const chpMinLoad = parseFloat(document.getElementById('chpMinLoad')?.value) || 60;
+    const plbCount     = parseInt(document.getElementById('plbCount')?.value) || 3;
+    const plbTable     = getPlbLoadTable();
+    const plbMaxCap    = plbTable.length > 0 ? plbTable[0].열Gcal : 68.8;
+    const storageCap   = parseFloat(document.getElementById('storageCapacity')?.value) || 1500;
+    const storageInit  = parseFloat(document.getElementById('storageInitial')?.value) || 750;
+    const storageMin   = parseFloat(document.getElementById('storageMinLevel')?.value) || 100;
+    const minRunTime   = parseFloat(document.getElementById('chpMinRunHours')?.value) || 4;
+    const minStopTime  = parseFloat(document.getElementById('chpMinStopHours')?.value) || 4;
+    const chpMinLoad   = parseFloat(document.getElementById('chpMinLoad')?.value) || 60;
     const plbMinRunHours = parseFloat(document.getElementById('plbMinRunHours')?.value) || 2;
 
-    const startupTimes = [0,
-        parseFloat(document.getElementById('hotTime')?.value) || 4,
-        parseFloat(document.getElementById('warmTime')?.value) || 6,
-        parseFloat(document.getElementById('coldTime')?.value) || 8];
-    const startupGasRates = [0,
-        parseFloat(document.getElementById('hotGasRate')?.value) || 300,
-        parseFloat(document.getElementById('warmGasRate')?.value) || 350,
-        parseFloat(document.getElementById('coldGasRate')?.value) || 400];
-    function calcStartupCost(stopLevel, ngCostNm3) {
-        if (stopLevel <= 0) return 0;
-        return startupTimes[stopLevel] * startupGasRates[stopLevel] * ngCostNm3;
-    }
+    // 기동 총 가스사용량 (Nm³): Hot(~8h정지), Warm(8~48h정지), Cold(48h+정지)
+    const startupGasTotal = [0,
+        parseFloat(document.getElementById('hotGasTotal')?.value) || 400,
+        parseFloat(document.getElementById('warmGasTotal')?.value) || 750,
+        parseFloat(document.getElementById('coldGasTotal')?.value) || 1500];
 
-    const STEP = 10;
-    const numStates = Math.floor((storageCap - storageMin) / STEP) + 1;
-    const stateToStorage = j => storageMin + j * STEP;
-    const storageToState = s => Math.min(numStates - 1, Math.max(0, Math.round((s - storageMin) / STEP)));
-    const NUM_STOP = 4;
+    // DP 상태공간
+    const STEP       = 10;
+    const numStates  = Math.floor((storageCap - storageMin) / STEP) + 1;
+    const NUM_STOP   = 4;
     const totalStates = numStates * NUM_STOP;
-    const dpIdx = (j, k) => j * NUM_STOP + k;
 
+    // 성능 옵션
     const perfOptions = chpLoadTable.filter(c => c.load >= chpMinLoad).map(c => ({
         load: c.load, heatRate: c.열Gcal, powerMW: c.송전MW, ngNm3: c.ngNm3,
     }));
-    const plbRef = plbTable.length > 0 ? plbTable[0] : null;
+    const plbRef     = plbTable.length > 0 ? plbTable[0] : null;
     const plb1DayCap = plbMaxCap * 24 * plbCount;
+
+    // 시간 후보
+    const hourCandidates = [0];
+    for (let h = Math.max(1, minRunTime); h <= 24; h++) hourCandidates.push(h);
 
     // 일별 비용 사전계산
     const dayInfo = days.map((d, i) => {
@@ -3565,276 +3675,538 @@ function solveMPC(horizon, onProgress) {
         return { ...d, idx: i, costs, plbCostPerGcal };
     });
 
-    const N = days.length;
-    const results = [];
-    let storageLevel = storageInit;
-    let sk = 3; // Cold start
-    let prevChpOn = false;
-    let prevChpEndH = 0;
-    let heurStopDays = 99;
+    return {
+        // 설정
+        storageCap, storageMin, minRunTime, minStopTime, plbMinRunHours,
+        plbCount, plbMaxCap, plb1DayCap, plbTable, plbRef,
+        startupGasTotal,
+        // DP 구조
+        STEP, numStates, NUM_STOP, totalStates, perfOptions, hourCandidates,
+        stateToStorage: j => storageMin + j * STEP,
+        storageToState: s => Math.min(numStates - 1, Math.max(0, Math.round((s - storageMin) / STEP))),
+        dpIdx: (j, k) => j * NUM_STOP + k,
+        // 데이터
+        dayInfo, N: days.length, horizon,
+        // 실행 상태 (매일 갱신됨)
+        storageLevel: storageInit,
+        sk: 3,              // Cold start
+        prevChpOn: false,
+        prevChpEndH: 0,
+        heurStopDays: 99,
+        // 결과 배열
+        results: [],
+        // 검증 경고
+        _warnings: [],
+    };
+}
 
-    // 시간 후보
-    const hourCandidates = [0];
-    for (let h = Math.max(1, minRunTime); h <= 24; h++) hourCandidates.push(h);
 
-    // ═══ 사전검증: 각 날/축열조잔량에서 넘치지 않는 최대 CHP 시간 ═══
-    // maxSafeHours[dayIdx][storageStateJ] = 넘침 없는 최대 가동시간
-    function calcMaxSafeHours(di, startStorage, heatPerH) {
+// ─── 헬퍼: 기동비용 계산 (DP용, sk 레벨 기반) ───
+// 설정의 총 기동 가스사용량(Nm³) × NG단가
+function _mpcCalcStartupCost(ctx, stopLevel, ngCostNm3) {
+    if (stopLevel <= 0) return 0;
+    return ctx.startupGasTotal[stopLevel] * ngCostNm3;
+}
+
+// ─── 헬퍼: 기동비용 계산 (실행용, 3구간 곡선) ───
+// 설정의 총 기동 가스사용량을 기준점으로 정지시간에 따른 곡선 적용
+// 특성:
+//   0~8h:  선형 증가 (0 → Hot 수준)
+//   8~48h: 완만한 선형 (Hot → Warm, 거의 차이 없음)
+//   48h+:  2차 곡선 급증 (Warm → Cold, Cold로 cap)
+function _mpcCalcStartupCostByHours(ctx, stopHours, ngCostNm3) {
+    if (stopHours <= 0) return 0;
+    const g = ctx.startupGasTotal;
+    const hotGas  = g[1];   // Hot 총가스 (예: 400 Nm³)
+    const warmGas = g[2];   // Warm 총가스 (예: 750 Nm³)
+    const maxGas  = g[3];   // Cold 총가스 = 상한 (예: 1,500 Nm³)
+
+    let gasNm3;
+    if (stopHours <= 8) {
+        // 0~8h: 선형 (0 → hotGas)
+        gasNm3 = hotGas * (stopHours / 8);
+    } else if (stopHours <= 48) {
+        // 8~48h: 완만한 선형 (hotGas → warmGas)
+        gasNm3 = hotGas + (warmGas - hotGas) * (stopHours - 8) / 40;
+    } else {
+        // 48h+: 2차 곡선 급증 (warmGas → maxGas, cap 적용)
+        const x = (stopHours - 48) / 48;
+        gasNm3 = Math.min(maxGas, warmGas + (maxGas - warmGas) * x * x);
+    }
+    return gasNm3 * ngCostNm3;
+}
+
+
+// ─── 헬퍼: 최적화 결과 검증 ───
+// Block 5(시뮬) 결과에서 제약조건 위반을 체크
+function _mpcValidate(ctx, today, block, sim) {
+    const d = ctx.dayInfo[today];
+    const warnings = [];
+
+    // 1. 축열조 하한 위반 (storageMin 미만)
+    // simulate24h에서 사전계산된 min/max 사용 (스프레드 연산자 제거)
+    const minStorage = sim.minStorage !== undefined ? sim.minStorage : Math.min(...sim.hourly.map(h => h.storage));
+    if (minStorage < ctx.storageMin) {
+        warnings.push({ type: 'underflow', day: `${d.month}/${d.day}`,
+            msg: `축열조 ${Math.round(minStorage)} < 최소 ${ctx.storageMin}`, severity: 'high' });
+    }
+
+    // 2. minStopTime 위반 (정지 후 너무 빨리 재기동)
+    if (block.chpHours > 0 && block.chpStart > 0 && ctx.prevChpOn) {
+        const gap = block.chpStart + (24 - ctx.prevChpEndH);
+        if (gap > 0 && gap < ctx.minStopTime) {
+            warnings.push({ type: 'minStop', day: `${d.month}/${d.day}`,
+                msg: `정지 ${gap}h < 최소정지 ${ctx.minStopTime}h`, severity: 'high' });
+        }
+    }
+
+    // 3. minRunTime 위반
+    if (block.chpHours > 0 && block.chpHours < ctx.minRunTime) {
+        warnings.push({ type: 'minRun', day: `${d.month}/${d.day}`,
+            msg: `가동 ${block.chpHours}h < 최소운전 ${ctx.minRunTime}h`, severity: 'high' });
+    }
+
+    // 4. 축열조 상한 위반 (overflow)
+    const maxStorage = sim.maxStorage !== undefined ? sim.maxStorage : Math.max(...sim.hourly.map(h => h.storage));
+    if (maxStorage > ctx.storageCap) {
+        warnings.push({ type: 'overflow', day: `${d.month}/${d.day}`,
+            msg: `축열조 ${Math.round(maxStorage)} > 최대 ${ctx.storageCap}`, severity: 'high' });
+    }
+
+    return warnings;
+}
+
+
+// ─── 헬퍼: 사전검증 (축열조 넘침 방지) ───
+// 입력: 날짜 인덱스, 축열조 잔량, CHP 시간당 열생산
+// 출력: 넘치지 않는 최대 CHP 가동시간 (0~24)
+function _mpcCalcMaxSafeHours(ctx, di, startStorage, heatPerH) {
+    const d = ctx.dayInfo[di];
+    const extH = d.adjExternal / 24;
+    const intH = d.adjIntecoNet / 24;
+    const demH = d.demandH;
+    for (let tryH = 24; tryH >= 0; tryH--) {
+        if (tryH > 0 && tryH < ctx.minRunTime) continue;
+        let ok = false;
+        if (tryH === 0) { ok = true; }
+        else if (tryH >= 24) {
+            let st = startStorage, overflow = false;
+            for (let h = 0; h < 24; h++) {
+                st += extH + intH + heatPerH - demH[h];
+                if (st > ctx.storageCap) { overflow = true; break; }
+                if (st < ctx.storageMin) st = ctx.storageMin;
+            }
+            ok = !overflow;
+        } else {
+            for (let s = 0; s <= 24 - tryH; s++) {
+                let st = startStorage, overflow = false;
+                for (let h = 0; h < 24; h++) {
+                    const chp = (h >= s && h < s + tryH) ? heatPerH : 0;
+                    st += extH + intH + chp - demH[h];
+                    if (st > ctx.storageCap) { overflow = true; break; }
+                    if (st < ctx.storageMin) st = ctx.storageMin;
+                }
+                if (!overflow) { ok = true; break; }
+            }
+        }
+        if (ok) return tryH;
+    }
+    return 0;
+}
+
+
+// ─── Block 1: 역방향 DP (시작시간 포함) ───
+// 오늘부터 horizon일 앞까지 역방향 탐색
+// 결정: (부하, 가동시간, 시작시간) — 시간대별 SMP, minStopTime, overflow 모두 반영
+// 출력: firstDayDecisions (상태별 최적 {hours, startH, loadIdx})
+function _mpcRunDP(ctx, today) {
+    const { dayInfo, totalStates, numStates, NUM_STOP, perfOptions, hourCandidates,
+            stateToStorage, storageToState, dpIdx, storageCap, storageMin,
+            minRunTime, minStopTime, plbMinRunHours, plbMaxCap, plb1DayCap, horizon, N } = ctx;
+
+    const endDay = Math.min(today + horizon, N);
+    const windowSize = endDay - today;
+
+    let dpCurr = new Float64Array(totalStates).fill(0);
+    let dpNext = new Float64Array(totalStates);
+    const firstDayDecisions = new Array(totalStates).fill(null).map(() => ({ hours: 0, startH: 0, loadIdx: 0 }));
+
+    for (let wi = windowSize - 1; wi >= 0; wi--) {
+        const di = today + wi;
         const d = dayInfo[di];
+        dpNext.set(dpCurr);
+        dpCurr.fill(Infinity);
+
+        // 시간별 데이터 준비
         const extH = d.adjExternal / 24;
         const intH = d.adjIntecoNet / 24;
         const demH = d.demandH;
-        // 24h부터 내려가며 넘침 없는 시간 찾기
-        for (let tryH = 24; tryH >= 0; tryH--) {
-            if (tryH > 0 && tryH < minRunTime) continue;
-            // 최적 시작시간으로 시뮬 (MP 높은 시간대 우선)
-            let ok = false;
-            if (tryH === 0) { ok = true; }
-            else if (tryH >= 24) {
-                // 24h: 전 시간 가동, 넘침 확인
-                let st = startStorage, overflow = false;
-                for (let h = 0; h < 24; h++) {
-                    st += extH + intH + heatPerH - demH[h];
-                    if (st > storageCap) { overflow = true; break; }
-                    if (st < storageMin) st = storageMin;
+        const mpH  = d.mpH;
+
+        // SMP prefix sum: mpPrefix[i] = sum(mpH[0..i-1])
+        const mpPrefix = new Float64Array(25);
+        for (let hh = 0; hh < 24; hh++) mpPrefix[hh + 1] = mpPrefix[hh] + mpH[hh];
+
+        // 시간별 기저 변화량 (CHP 없이): baseFlow[h] = ext + int - dem[h]
+        const baseFlow = new Float64Array(24);
+        for (let hh = 0; hh < 24; hh++) baseFlow[hh] = extH + intH - demH[hh];
+
+        // 누적 기저 변화량: baseCum[i] = sum(baseFlow[0..i-1])
+        const baseCum = new Float64Array(25);
+        for (let hh = 0; hh < 24; hh++) baseCum[hh + 1] = baseCum[hh] + baseFlow[hh];
+
+        // 구간별 최대 누적 기저: baseMaxCum[i] = max(baseCum[1..i])
+        // overflow 빠른 체크용: s + baseMaxCum[endH] + chpCum이 최대 축열조
+        const baseMaxCum = new Float64Array(25);
+        for (let hh = 1; hh <= 24; hh++) baseMaxCum[hh] = Math.max(baseMaxCum[hh - 1], baseCum[hh]);
+
+        // ── 사전계산: 기동비 테이블 (항목 1) ──
+        // suCostTab[k][startH]: 동일 (k, startH) 조합은 결과 동일 → 배열 조회로 대체
+        const suCostTab = new Array(NUM_STOP);
+        for (let k = 0; k < NUM_STOP; k++) {
+            suCostTab[k] = new Float64Array(25);
+            for (let startH = 0; startH <= 24; startH++) {
+                if (k > 0) {
+                    suCostTab[k][startH] = _mpcCalcStartupCostByHours(ctx, k * 24 + startH, d.ngCostNm3);
+                } else if (startH > 0) {
+                    suCostTab[k][startH] = _mpcCalcStartupCostByHours(ctx, startH, d.ngCostNm3);
                 }
-                ok = !overflow;
-            } else {
-                // 부분 가동: 어떤 시작시간이든 넘치지 않는지
-                for (let s = 0; s <= 24 - tryH; s++) {
-                    let st = startStorage, overflow = false;
-                    for (let h = 0; h < 24; h++) {
-                        const chp = (h >= s && h < s + tryH) ? heatPerH : 0;
-                        st += extH + intH + chp - demH[h];
-                        if (st > storageCap) { overflow = true; break; }
-                        if (st < storageMin) st = storageMin;
-                    }
-                    if (!overflow) { ok = true; break; }
+                // k=0 && startH=0 → 0 (Float64Array 기본값)
+            }
+        }
+
+        // ── 사전계산: netCost / surplusEnd 테이블 (항목 2) ──
+        // 이 값들은 상태(j)와 정지레벨(k)에 무관 → j×k 루프 밖에서 1회만 계산
+        const hLen = hourCandidates.length;
+        const costTabSize = perfOptions.length * hLen * 25;
+        const netCostTab = new Float64Array(costTabSize);
+        const surplusEndTab = new Float64Array(costTabSize);
+        const chpHeatTab = new Float64Array(costTabSize);
+
+        for (let li = 0; li < perfOptions.length; li++) {
+            const perf = d.costs[li];
+            const heatPerH = perf.heatRate;
+            for (let hi = 0; hi < hLen; hi++) {
+                const h = hourCandidates[hi];
+                if (h <= 0) continue;
+                for (let startH = 0; startH <= 24 - h; startH++) {
+                    const flatIdx = li * hLen * 25 + hi * 25 + startH;
+                    const mpSum = mpPrefix[startH + h] - mpPrefix[startH];
+                    netCostTab[flatIdx] = h * perf.ngCostH - mpSum * perf.powerMW * 1000;
+                    surplusEndTab[flatIdx] = baseCum[startH + h] + h * heatPerH;
+                    chpHeatTab[flatIdx] = h * heatPerH;
                 }
             }
-            if (ok) return tryH;
         }
-        return 0;
-    }
 
-    // 초기 데이터 준비 완료 알림
-    if (onProgress) onProgress(0, 0, 'wf_data');
+        // ── 인라인 상수 (항목 3) ──
+        const _storageMin = storageMin;
+        const _STEP = ctx.STEP;
+        const _numStates1 = numStates - 1;
 
-    // ═══ MPC 루프: 매일 DP + 1일 실행 ═══
-    for (let today = 0; today < N; today++) {
-        if (onProgress && today % 3 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_presim');
+        for (let j = 0; j < numStates; j++) {
+            const s = _storageMin + j * _STEP;  // stateToStorage 인라인
+            for (let k = 0; k < NUM_STOP; k++) {
+                const idx = j * NUM_STOP + k;  // dpIdx 인라인
+                let bestCost = Infinity, bestDec = { hours: 0, startH: 0, loadIdx: 0 };
 
-        // ── 미니 DP: today ~ min(today+horizon, N-1) 역방향 탐색 ──
-        if (onProgress && today % 10 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_dp');
-        const endDay = Math.min(today + horizon, N);
-        const windowSize = endDay - today;
+                // ── 미가동(h=0) 후보 ──
+                {
+                    let newS = s - d.netRequired;
+                    let plbCost = 0;
+                    if (newS < storageMin) {
+                        const deficit = storageMin - newS;
+                        const plbMinHeat = plbMinRunHours * plbMaxCap;
+                        const plbHeat = Math.min(plb1DayCap, Math.max(deficit, Math.min(plbMinHeat, deficit * 2)));
+                        plbCost = plbHeat * d.plbCostPerGcal;
+                        newS += plbHeat;
+                        if (newS < storageMin) newS = storageMin;
+                    }
+                    if (newS > storageCap) newS = storageCap;
+                    const nextK = Math.min(k + 1, NUM_STOP - 1);
+                    const jNew = Math.min(_numStates1, Math.max(0, Math.round((newS - _storageMin) / _STEP)));
+                    const totalCost = plbCost + dpNext[jNew * NUM_STOP + nextK];
+                    if (totalCost < bestCost) {
+                        bestCost = totalCost;
+                        bestDec = { hours: 0, startH: 0, loadIdx: 0 };
+                    }
+                }
 
-        let dpCurr = new Float64Array(totalStates).fill(0);
-        let dpNext = new Float64Array(totalStates);
-        const firstDayDecisions = new Array(totalStates).fill(null).map(() => ({ hours: 0, loadIdx: 0 }));
+                // 정비일이면 가동 불가
+                if (d.isMaint) {
+                    dpCurr[idx] = bestCost;
+                    if (wi === 0) firstDayDecisions[idx] = bestDec;
+                    continue;
+                }
 
-        for (let wi = windowSize - 1; wi >= 0; wi--) {
-            const di = today + wi;
-            const d = dayInfo[di];
-            dpNext.set(dpCurr);
-            dpCurr.fill(Infinity);
+                // ── 가동 후보: (부하 × 시간 × 시작시간) ──
+                const overflowLimit = storageCap - s;  // s + surplus > cap → surplus > limit
+                const _suCostK = suCostTab[k];  // 현재 정지레벨의 기동비 배열
 
-            for (let j = 0; j < numStates; j++) {
-                const s = stateToStorage(j);
-                for (let k = 0; k < NUM_STOP; k++) {
-                    const idx = dpIdx(j, k);
-                    let bestCost = Infinity, bestDec = { hours: 0, loadIdx: 0 };
+                for (let li = 0; li < perfOptions.length; li++) {
+                    const liBase = li * hLen * 25;
 
-                    for (let li = 0; li < perfOptions.length; li++) {
-                        const perf = d.costs[li];
-                        // 시간별 사전검증: 이 축열조 잔량에서 넘치지 않는 최대 시간
-                        const maxH = (wi === 0) ? calcMaxSafeHours(di, s, perf.heatRate) : 24;
-                        for (const h of hourCandidates) {
-                            if (h > maxH) continue; // 시간별 검증 통과 못하면 스킵
-                            if (h > 0 && d.isMaint) continue;
+                    for (let hi = 1; hi < hLen; hi++) {  // hi=0은 h=0 (미가동), 건너뜀
+                        const h = hourCandidates[hi];
+                        const hiBase = liBase + hi * 25;
 
-                            const chpHeat = h * perf.heatRate;
-                            const chpCost = h * perf.netCostH;
+                        for (let startH = 0; startH <= 24 - h; startH++) {
+                            if (k > 0 && startH < minStopTime) continue;
 
-                            let suCost = 0, nextK;
-                            if (h > 0) {
-                                nextK = 0;
-                                if (k > 0) suCost = calcStartupCost(k, d.ngCostNm3);
-                            } else {
-                                nextK = Math.min(k + 1, NUM_STOP - 1);
-                            }
+                            // overflow 빠른 체크
+                            const surplusPre = (startH > 0) ? baseMaxCum[startH] : 0;
+                            const flatIdx = hiBase + startH;
+                            const surplusEnd = surplusEndTab[flatIdx];
+                            if (surplusPre > overflowLimit || surplusEnd > overflowLimit) continue;
 
-                            let newS = s + chpHeat - d.netRequired;
+                            // 사전계산 테이블에서 비용 조회 (항목 1, 2)
+                            const netCost = netCostTab[flatIdx];
+                            const suCost = _suCostK[startH];
+
+                            // 축열조 최종 잔량
+                            let newS = s + chpHeatTab[flatIdx] - d.netRequired;
 
                             // PLB
                             let plbCost = 0;
-                            if (newS < storageMin) {
-                                const deficit = storageMin - newS;
+                            if (newS < _storageMin) {
+                                const deficit = _storageMin - newS;
                                 const plbMinHeat = plbMinRunHours * plbMaxCap;
                                 const plbHeat = Math.min(plb1DayCap, Math.max(deficit, Math.min(plbMinHeat, deficit * 2)));
                                 plbCost = plbHeat * d.plbCostPerGcal;
                                 newS += plbHeat;
-                                if (newS < storageMin) newS = storageMin;
+                                if (newS < _storageMin) newS = _storageMin;
                             }
+                            if (newS > storageCap) continue;
 
-                            // Overflow
-                            if (newS > storageCap) {
-                                if (h === 0) newS = storageCap;
-                                else continue;
-                            }
+                            // 다음 정지레벨: 24시까지 가동이면 ON, 아니면 Hot
+                            const nextK = (startH + h >= 24) ? 0 : 1;
 
-                            const jNew = storageToState(newS);
-                            const totalCost = chpCost + suCost + plbCost + dpNext[dpIdx(jNew, nextK)];
+                            // storageToState + dpIdx 인라인 (항목 3)
+                            const jNew = Math.min(_numStates1, Math.max(0, Math.round((newS - _storageMin) / _STEP)));
+                            const totalCost = netCost + suCost + plbCost + dpNext[jNew * NUM_STOP + nextK];
 
                             if (totalCost < bestCost) {
                                 bestCost = totalCost;
-                                bestDec = { hours: h, loadIdx: li };
+                                bestDec = { hours: h, startH, loadIdx: li };
                             }
                         }
                     }
-                    dpCurr[idx] = bestCost;
-                    if (wi === 0) firstDayDecisions[idx] = bestDec;
                 }
+                dpCurr[idx] = bestCost;
+                if (wi === 0) firstDayDecisions[idx] = bestDec;
             }
         }
+    }
+    return firstDayDecisions;
+}
 
-        // ── 오늘의 최적 결정 추출 ──
-        if (onProgress && today % 10 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_decide');
-        const sj = storageToState(storageLevel);
-        const dec = firstDayDecisions[dpIdx(sj, sk)];
-        let chpHours = dec.hours;
-        const perf = dayInfo[today].costs[dec.loadIdx];
-        const chpLoadPct = perfOptions[dec.loadIdx].load;
-        const chpHeatPerH = perf.heatRate;
-        const d = dayInfo[today];
 
-        // 기동비용
-        let startupCost = 0;
-        if (chpHours > 0 && sk > 0) {
-            startupCost = Math.round(calcStartupCost(sk, d.ngCostNm3));
+// ─── Block 2: 결정 추출 ───
+// DP 결과에서 현재 축열조/정지상태 기반으로 오늘의 최적 결정을 꺼냄
+// DP가 시작시간까지 결정했으므로 Block 3(배치)은 불필요
+// 출력: { chpHours, chpStart, chpHeatPerH, chpLoadPct, perf, startupCost }
+function _mpcExtractDecision(ctx, today, firstDayDecisions) {
+    const { storageToState, dpIdx, dayInfo, perfOptions } = ctx;
+    const sj = storageToState(ctx.storageLevel);
+    const dec = firstDayDecisions[dpIdx(sj, ctx.sk)];
+    const chpHours   = dec.hours;
+    const chpStart   = dec.startH || 0;
+    const perf       = dayInfo[today].costs[dec.loadIdx];
+    const chpLoadPct = perfOptions[dec.loadIdx].load;
+    const chpHeatPerH = perf.heatRate;
+    const d = dayInfo[today];
+
+    // 기동비: 실제 gap > 0이면 비례 기동비 (최적탐색과 동일 규칙)
+    let startupCost = 0;
+    if (chpHours > 0) {
+        const gap = chpStart + (24 - ctx.prevChpEndH);
+        if (gap > 0) {
+            const totalStopH = (ctx.heurStopDays * 24) + gap;
+            startupCost = Math.round(_mpcCalcStartupCostByHours(ctx, totalStopH, d.ngCostNm3));
         }
-        if (chpHours > 0) sk = 0; else sk = Math.min(sk + 1, NUM_STOP - 1);
+    }
 
-        // ── Stage 2: 블록 배치 (overflow 거부) ──
-        if (onProgress && today % 10 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_block');
-        const hourlyExt = d.adjExternal / 24;
-        const intecoH = d.adjIntecoNet / 24;
-        const demandH = d.demandH;
-        const smpH = d.smpH || Array(24).fill(d.smpAvg);
+    return { chpHours, chpStart, chpHeatPerH, chpLoadPct, perf, startupCost };
+}
 
-        let chpStart = 0;
-        if (chpHours > 0 && chpHours < 24) {
-            let bestScore = -Infinity;
-            let tryHours = chpHours;
-            while (tryHours >= minRunTime) {
-                bestScore = -Infinity;
-                for (let s = 0; s <= 24 - tryHours; s++) {
-                    const gapFromPrev = s + (24 - prevChpEndH);
-                    if (prevChpOn && gapFromPrev > 0 && gapFromPrev < minStopTime) continue;
-                    let stSim = storageLevel, smpSum = 0, overflow = 0, underflow = 0;
-                    for (let h = 0; h < 24; h++) {
-                        const chp = (h >= s && h < s + tryHours) ? chpHeatPerH : 0;
-                        stSim += hourlyExt + intecoH + chp - demandH[h];
-                        if (stSim > storageCap) { overflow += stSim - storageCap; stSim = storageCap; }
-                        if (stSim < storageMin) { underflow += storageMin - stSim; stSim = storageMin; }
-                        if (h >= s && h < s + tryHours) smpSum += d.mpH[h];
-                    }
-                    if (overflow > 0) continue;
-                    const score = smpSum - underflow * 200;
-                    if (score > bestScore) { bestScore = score; chpStart = s; chpHours = tryHours; }
-                }
-                if (bestScore > -Infinity) break;
-                tryHours--;
+
+// ─── Block 4: PLB 투입 판단 (Stage 3) ───
+// CHP 배치 후 축열조 부족 시 보조보일러 투입 결정
+// 입력: ctx, today, block
+// 출력: { plbHeat, plbUnits, plbHours, plbNg, plbLoad, plbStartH }
+function _mpcDecidePLB(ctx, today, block, chpHeatPerH) {
+    const { storageCap, storageMin, plbTable, plbCount, plbMinRunHours, dayInfo, plbMaxCap } = ctx;
+    const d = dayInfo[today];
+    const hourlyExt = d.adjExternal / 24;
+    const intecoH   = d.adjIntecoNet / 24;
+    const demandH   = d.demandH;
+    const { chpStart, chpHours } = block;
+
+    // 24h 사전 시뮬로 부족 여부 확인
+    let stCheck = ctx.storageLevel, needPlb = false, minSt = ctx.storageLevel, minStH = 0;
+    let firstUnderH = -1;  // 최초 부족 시점
+    for (let h = 0; h < 24; h++) {
+        const chpOn = chpHours > 0 && h >= chpStart && h < chpStart + chpHours;
+        const chp = chpOn ? chpHeatPerH : 0;
+        stCheck += hourlyExt + intecoH + chp - demandH[h];
+        if (stCheck > storageCap) stCheck = storageCap;
+        if (stCheck < minSt) { minSt = stCheck; minStH = h; }
+        if (stCheck < storageMin) {
+            needPlb = true;
+            if (firstUnderH < 0) firstUnderH = h;
+        }
+    }
+
+    let plbHeat = 0, plbUnits = 0, plbHours = 0, plbNg = 0, plbLoad = 0, plbStartH = 0;
+    if (needPlb) {
+        const deficit = storageMin - minSt;
+        if (deficit > 0) {
+            const bestPlb = plbTable[0];
+            plbUnits = Math.ceil(deficit / (bestPlb.열Gcal * Math.max(plbMinRunHours, 1)));
+            plbUnits = Math.min(plbUnits, plbCount);
+            if (plbUnits < 1) plbUnits = 1;
+            plbLoad = bestPlb.load;
+            plbHours = Math.ceil(deficit / (plbUnits * bestPlb.열Gcal));
+            plbHours = Math.max(plbMinRunHours, Math.min(24, plbHours));
+            const actualHeat = plbHours * plbUnits * bestPlb.열Gcal;
+            if (actualHeat > deficit * 2 && plbHours > plbMinRunHours) {
+                plbHours = Math.max(plbMinRunHours, Math.ceil(deficit * 2 / (plbUnits * bestPlb.열Gcal)));
             }
-            if (bestScore === -Infinity) chpHours = 0;
+            plbHeat = plbHours * plbUnits * bestPlb.열Gcal;
+            plbNg = plbHours * plbUnits * bestPlb.ngNm3;
+            // PLB 시작시각: 최초 부족 시점 전에 배치 (부족 전에 미리 가동)
+            const refH = firstUnderH >= 0 ? firstUnderH : minStH;
+            plbStartH = Math.max(0, refH - plbHours);
+            if (plbStartH + plbHours > 24) plbStartH = 24 - plbHours;
         }
+    }
 
-        // ── Stage 3: PLB 투입 ──
-        if (onProgress && today % 10 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_plb');
-        let stCheck = storageLevel, needPlb = false, minSt = storageLevel, minStH = 0;
-        for (let h = 0; h < 24; h++) {
-            const chp = (chpHours >= 24 || (h >= chpStart && h < chpStart + chpHours && chpHours > 0)) ? chpHeatPerH : 0;
-            stCheck += hourlyExt + intecoH + chp - demandH[h];
-            if (stCheck > storageCap) stCheck = storageCap;
-            if (stCheck < minSt) { minSt = stCheck; minStH = h; }
-            if (stCheck < storageMin) needPlb = true;
+    return { plbHeat, plbUnits, plbHours, plbNg, plbLoad, plbStartH };
+}
+
+
+// ─── Block 5: 시간별 시뮬레이션 (Stage 4) ───
+// 0시~23시 1시간씩 CHP+PLB+외부수열-수요 시뮬
+// 입력: ctx, today, block, plb, decision
+// 출력: { hourly (24시간 배열), finalStorage }
+function _mpcSimulate24h(ctx, today, block, plb, decision) {
+    const { storageCap, storageMin, dayInfo } = ctx;
+    const d = dayInfo[today];
+    const hourlyExt   = d.adjExternal / 24;
+    const intecoH     = d.adjIntecoNet / 24;
+    const demandH     = d.demandH;
+    const smpH        = d.smpH || Array(24).fill(d.smpAvg);
+    const { chpStart, chpHours } = block;
+    const { plbHeat, plbHours, plbStartH } = plb;
+    const { chpHeatPerH, perf } = decision;
+
+    const hourly = [];
+    const startStorage = ctx.storageLevel;
+    let stH = startStorage;
+    let minSt = Infinity, maxSt = -Infinity;
+    for (let h = 0; h < 24; h++) {
+        const chpOn = chpHours > 0 && h >= chpStart && h < chpStart + chpHours;
+        const chp = chpOn ? chpHeatPerH : 0;
+        const plbH = (plbHours > 0 && h >= plbStartH && h < plbStartH + plbHours) ? (plbHeat / plbHours) : 0;
+        let actualChp = chp;
+        const projected = stH + hourlyExt + intecoH + actualChp + plbH - demandH[h];
+        if (projected > storageCap && actualChp > 0) {
+            actualChp = Math.max(0, storageCap - stH - hourlyExt - intecoH - plbH + demandH[h]);
         }
+        stH += hourlyExt + intecoH + actualChp + plbH - demandH[h];
+        if (stH > storageCap) stH = storageCap;
+        // 축열조 하한: 물리적 한계(0)만 적용, storageMin 클램핑 제거
+        // → 에너지 밸런스 정확도 확보, 부족 상황 가시화
+        if (stH < 0) stH = 0;
+        if (stH < minSt) minSt = stH;
+        if (stH > maxSt) maxSt = stH;
+        const chpPowerKWh = (actualChp > 0) ? perf.powerMW * 1000 * (actualChp / (chpHeatPerH || 1)) : 0;
+        hourly.push({ hour: h, demand: demandH[h], ext: hourlyExt + intecoH, chp: actualChp, plb: plbH, storage: Math.round(stH), smp: smpH[h], mp: d.mpH[h], chpPowerKWh });
+    }
 
-        let plbHeat = 0, plbUnits = 0, plbHours = 0, plbNg = 0, plbLoad = 0, plbStartH = 0;
-        if (needPlb) {
-            const deficit = storageMin - minSt;
-            if (deficit > 0) {
-                const bestPlb = plbTable[0];
-                plbUnits = Math.ceil(deficit / (bestPlb.열Gcal * Math.max(plbMinRunHours, 1)));
-                plbUnits = Math.min(plbUnits, plbCount);
-                if (plbUnits < 1) plbUnits = 1;
-                plbLoad = bestPlb.load;
-                plbHours = Math.ceil(deficit / (plbUnits * bestPlb.열Gcal));
-                plbHours = Math.max(plbMinRunHours, Math.min(24 - chpHours, plbHours));
-                const actualHeat = plbHours * plbUnits * bestPlb.열Gcal;
-                if (actualHeat > deficit * 2 && plbHours > plbMinRunHours) {
-                    plbHours = Math.max(plbMinRunHours, Math.ceil(deficit * 2 / (plbUnits * bestPlb.열Gcal)));
-                }
-                plbHeat = plbHours * plbUnits * bestPlb.열Gcal;
-                plbNg = plbHours * plbUnits * bestPlb.ngNm3;
-                plbStartH = Math.max(0, minStH - plbHours);
-            }
-        }
+    return { hourly, finalStorage: stH, startStorage: Math.round(startStorage), minStorage: minSt, maxStorage: maxSt };
+}
 
-        // ── Stage 4: 시간별 시뮬 ──
-        if (onProgress && today % 10 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_sim');
-        const hourly = [];
-        let stH = storageLevel;
-        for (let h = 0; h < 24; h++) {
-            const chp = (chpHours >= 24 || (h >= chpStart && h < chpStart + chpHours && chpHours > 0)) ? chpHeatPerH : 0;
-            const plb = (plbHours > 0 && h >= plbStartH && h < plbStartH + plbHours) ? (plbHeat / plbHours) : 0;
-            let actualChp = chp;
-            const projected = stH + hourlyExt + intecoH + actualChp + plb - demandH[h];
-            if (projected > storageCap && actualChp > 0) {
-                actualChp = Math.max(0, storageCap - stH - hourlyExt - intecoH - plb + demandH[h]);
-            }
-            stH += hourlyExt + intecoH + actualChp + plb - demandH[h];
-            if (stH > storageCap) stH = storageCap;
-            if (stH < storageMin) stH = storageMin;
-            const chpPowerKWh = (actualChp > 0) ? perf.powerMW * 1000 * (actualChp / (chpHeatPerH || 1)) : 0;
-            hourly.push({ hour: h, demand: demandH[h], ext: hourlyExt + intecoH, chp: actualChp, plb, storage: Math.round(stH), smp: smpH[h], mp: d.mpH[h], chpPowerKWh });
-        }
-        storageLevel = stH;
 
-        // 집계
-        const chpHeat = hourly.reduce((s, hr) => s + hr.chp, 0);
-        const chpPower = hourly.reduce((s, hr) => s + hr.chpPowerKWh, 0) / 1000; // MWh
-        const chpNg = chpHours * perf.ngNm3;
-        const chpFuelCost = Math.round(chpHours * perf.ngCostH);
-        let chpElecRev = 0;
-        hourly.forEach(hr => { if (hr.chp > 0) chpElecRev += hr.mp * perf.powerMW * 1000 * (hr.chp / (chpHeatPerH || 1)); });
-        chpElecRev = Math.round(chpElecRev);
-        const chpNetCost = chpFuelCost - chpElecRev;
-        const chpCostPerGcal = chpHeat > 0 ? Math.round(chpNetCost / chpHeat) : 0;
-        const plbFuelCost = Math.round(plbNg * d.ngPLBNm3);
+// ─── Block 6: 일별 비용 집계 ───
+// 시뮬 결과로부터 비용/수익을 집계하여 일별 결과 생성
+// 입력: ctx, today, decision, block, plb, sim
+// 출력: 일별 결과 객체
+function _mpcSummarize(ctx, today, decision, block, plb, sim) {
+    const d = ctx.dayInfo[today];
+    const smpH = d.smpH || Array(24).fill(d.smpAvg);
+    const { chpHeatPerH, chpLoadPct, perf, startupCost } = decision;
+    const { chpStart, chpHours } = block;
+    const { plbHeat, plbUnits, plbHours, plbNg, plbLoad } = plb;
+    const { hourly, finalStorage } = sim;
 
-        prevChpOn = chpHours > 0;
-        prevChpEndH = chpHours > 0 ? chpStart + chpHours : prevChpEndH;
-        if (chpHours > 0) heurStopDays = 0; else heurStopDays++;
+    const chpHeat     = hourly.reduce((s, hr) => s + hr.chp, 0);
+    const chpPower    = hourly.reduce((s, hr) => s + hr.chpPowerKWh, 0) / 1000;
+    const chpNg       = chpHours * perf.ngNm3;
+    const chpFuelCost = Math.round(chpHours * perf.ngCostH);
+    let chpElecRev = 0;
+    hourly.forEach(hr => { if (hr.chp > 0) chpElecRev += hr.mp * perf.powerMW * 1000 * (hr.chp / (chpHeatPerH || 1)); });
+    chpElecRev = Math.round(chpElecRev);
+    const chpNetCost     = chpFuelCost - chpElecRev;
+    const chpCostPerGcal = chpHeat > 0 ? Math.round(chpNetCost / chpHeat) : 0;
+    const plbFuelCost    = Math.round(plbNg * d.ngPLBNm3);
 
-        results.push({
-            month: d.month, day: d.day, dow: d.dow, dowName: d.dowName,
-            isWeekend: d.isWeekend, isHoliday: d.isHoliday, isMaint: d.isMaint,
-            demand: d.demand, adjExternal: d.adjExternal, adjIntecoNet: d.adjIntecoNet,
-            netRequired: d.netRequired, smpAvg: d.smpAvg, smpH,
-            chpHours, chpHeat, chpPower, chpNg, chpLoad: chpLoadPct,
-            plbUnits, plbHours, plbHeat, plbNg, plbLoad,
-            storageLevel: Math.round(stH), hourly,
-            chpFuelCost, chpElecRev, chpNetCost, startupCost,
-            plbFuelCost, totalFuelCost: chpFuelCost + plbFuelCost + startupCost,
-            totalNetCost: chpNetCost + plbFuelCost + startupCost,
-            chpCostPerGcal, plbCostPerGcal: plbHeat > 0 ? Math.round(plbFuelCost / plbHeat) : 0,
-            dayType: d.isMaint ? '정비' : (d.isHoliday ? '공휴일' : (d.isWeekend ? '주말' : '평일')),
-        });
+    return {
+        month: d.month, day: d.day, dow: d.dow, dowName: d.dowName,
+        isWeekend: d.isWeekend, isHoliday: d.isHoliday, isMaint: d.isMaint,
+        demand: d.demand, adjExternal: d.adjExternal, adjIntecoNet: d.adjIntecoNet,
+        netRequired: d.netRequired, smpAvg: d.smpAvg, smpH,
+        chpHours, chpHeat, chpPower, chpNg, chpLoad: chpLoadPct,
+        plbUnits, plbHours, plbHeat, plbNg, plbLoad,
+        storageLevel: Math.round(finalStorage), storageStart: sim.startStorage, hourly,
+        chpFuelCost, chpElecRev, chpNetCost, startupCost,
+        plbFuelCost, totalFuelCost: chpFuelCost + plbFuelCost + startupCost,
+        totalNetCost: chpNetCost + plbFuelCost + startupCost,
+        chpCostPerGcal, plbCostPerGcal: plbHeat > 0 ? Math.round(plbFuelCost / plbHeat) : 0,
+        plbRefCostPerGcal: Math.round(d.plbCostPerGcal),
+        ngCostNm3: d.ngCostNm3,
+        dayType: d.isMaint ? '정비' : (d.isHoliday ? '공휴일' : (d.isWeekend ? '주말' : '평일')),
+    };
+}
+
+
+// ─── 진입점: solveMPC ───
+// Block 0~6을 순서대로 호출하여 365일 최적화 실행
+function solveMPC(horizon, onProgress) {
+
+    // Block 0: 초기화
+    const ctx = _mpcInit(horizon);
+    if (!ctx) return null;
+    if (onProgress) onProgress(0, 0, 'wf_data');
+
+    const { N, NUM_STOP } = ctx;
+
+    // ═══ MPC 루프: 매일 최적탐색 → 결정추출 → PLB → 시뮬 → 집계 ═══
+    for (let today = 0; today < N; today++) {
+        if (onProgress && today % 3 === 0) onProgress(Math.round(today / N * 100), today + 1, 'wf_presim');
+
+        const dpResult = _mpcRunDP(ctx, today);
+        const decision = _mpcExtractDecision(ctx, today, dpResult);
+        const block = { chpStart: decision.chpStart, chpHours: decision.chpHours };
+        const plb = _mpcDecidePLB(ctx, today, block, decision.chpHeatPerH);
+        const sim = _mpcSimulate24h(ctx, today, block, plb, decision);
+        const warns = _mpcValidate(ctx, today, block, sim);
+        if (warns.length > 0) ctx._warnings.push(...warns);
+        const result = _mpcSummarize(ctx, today, decision, block, plb, sim);
+
+        ctx.storageLevel = sim.finalStorage;
+        ctx.prevChpOn    = block.chpHours > 0;
+        ctx.prevChpEndH  = block.chpHours > 0 ? block.chpStart + block.chpHours : ctx.prevChpEndH;
+        if (block.chpHours > 0) ctx.heurStopDays = 0; else ctx.heurStopDays++;
+        if (block.chpHours <= 0) ctx.sk = Math.min(ctx.sk + 1, NUM_STOP - 1);
+        else if (block.chpStart + block.chpHours >= 24) ctx.sk = 0;
+        else ctx.sk = 1;
+
+        ctx.results.push(result);
     }
 
     if (onProgress) onProgress(100, N);
-    return results;
+    return ctx.results;
 }
 
 // ─── 월별 요약 집계 ───
@@ -4804,7 +5176,6 @@ function renderElecCostComparison(simResults) {
             data: {
                 labels,
                 datasets: [
-                    { label: '실적 전력비', data: labels.map((_, i) => Math.round((actualCost?.[i+1]?.total || 0) / div)), backgroundColor: 'rgba(148,163,184,0.3)', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 4 },
                     { label: '계획 전력비', data: labels.map((_, i) => Math.round((plannedCost?.[i+1]?.total || 0) / div)), backgroundColor: 'rgba(59,130,246,0.3)', borderColor: '#3b82f6', borderWidth: 1, borderRadius: 4 },
                 ]
             },
@@ -5236,6 +5607,7 @@ function _calcDayDetailData(simResults, dayIndex) {
 // ── 일별 세부 모달: 내부 콘텐츠 업데이트 (DOM 재사용) ──
 let _dayDetailCurrentIndex = 0;
 let _dayDetailSimResults = null;
+let _dayDetailViewMode = 'graph'; // 'graph' | 'data'
 
 function _updateDayDetailContent(dayIndex) {
     _dayDetailCurrentIndex = dayIndex;
@@ -5290,6 +5662,9 @@ function _updateDayDetailContent(dayIndex) {
         _dayDetailChart.update('none'); // 애니메이션 없이 즉시 업데이트
     }
 
+    // 데이터 뷰가 활성화 상태면 업데이트
+    if (_dayDetailViewMode === 'data') _updateDataPanel();
+
     // 축방열 + SMP 배지 업데이트 (차트 x축 정렬)
     if (_dayDetailChart) {
         const ca = _dayDetailChart.chartArea;
@@ -5304,7 +5679,7 @@ function _updateDayDetailContent(dayIndex) {
                 stValsEl.style.width = w;
                 let stHtml = '';
                 for (let h = 0; h < 24; h++) {
-                    const prev = h === 0 ? (r.storageLevel || hours[0]?.storage || 0) : hours[h - 1].storage;
+                    const prev = h === 0 ? (r.storageStart ?? r.storageLevel ?? 0) : hours[h - 1].storage;
                     const cur = hours[h]?.storage || 0;
                     const diff = cur - prev;
                     const isCharge = diff > 0;
@@ -5334,6 +5709,91 @@ function _updateDayDetailContent(dayIndex) {
     }
 }
 
+function _updateDataPanel() {
+    const el = document.getElementById('ddm_dataTable');
+    if (!el || !_dayDetailSimResults) return;
+    const r = _dayDetailSimResults[_dayDetailCurrentIndex];
+    if (!r || !r.hourly) return;
+
+    // CHP/PLB 시간별 단가 계산 (기동비 미포함)
+    const chpFuelPerH = r.chpHours > 0 ? r.chpFuelCost / r.chpHours : 0;
+    const chpHeatPerH = r.chpHours > 0 ? r.chpHeat / r.chpHours : 0;
+    const plbUnitCost = r.plbHeat > 0 ? Math.round(r.plbFuelCost / r.plbHeat) : 0;
+
+    // CHP 100% 기준단가 계산용
+    const chpLoadTable = getChpLoadTable();
+    const chp100 = chpLoadTable.length > 0 ? chpLoadTable[0] : null; // 최대부하 (100%)
+    const ngCostNm3 = r.ngCostNm3 || 0;
+
+    // PLB 기준단가 (100% 부하, dayInfo 기준 — 미가동일에도 항상 표시)
+    const plbRefCost = r.plbRefCostPerGcal || 0;
+
+    const th = 'style="padding:3px 4px;text-align:right;white-space:nowrap"';
+    const thC = 'style="padding:3px 4px;text-align:center;white-space:nowrap"';
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:10px;color:#b0b0d0">';
+    html += `<thead><tr style="color:#8b5cf6;border-bottom:1px solid #2a2a4a">`;
+    html += `<th ${thC}>시</th>`;
+    html += `<th ${th}>수요</th><th ${th}>외부</th><th ${th}>CHP</th><th ${th}>PLB</th>`;
+    html += `<th ${th}>축열조</th><th ${th}>축방열</th>`;
+    html += `<th ${th}>SMP</th><th ${th}>MP</th>`;
+    html += `<th ${th} style="color:#3b82f6">CHP계획</th>`;
+    html += `<th ${th} style="color:#60a5fa">CHP기준</th>`;
+    html += `<th ${th} style="color:#f59e0b">PLB계획</th>`;
+    html += `<th ${th} style="color:#fbbf24">PLB기준</th>`;
+    html += `</tr></thead><tbody>`;
+
+    for (let i = 0; i < r.hourly.length; i++) {
+        const h = r.hourly[i];
+        const prev = i === 0 ? (r.storageStart ?? r.storageLevel ?? 0) : r.hourly[i - 1].storage;
+        const diff = h.storage - prev;
+        const diffColor = diff > 0 ? '#60a5fa' : (diff < 0 ? '#f87171' : '#555');
+
+        // CHP계획 단가 (기동비 제외): 실제 운전 부하 기준, 가동시만
+        let chpPlanStr = '-';
+        if (h.chp > 0 && chpHeatPerH > 0) {
+            const revH = h.mp * (h.chpPowerKWh || 0);
+            const netH = chpFuelPerH - revH;
+            const chpPlanCost = Math.round(netH / h.chp);
+            const cc = chpPlanCost < 0 ? '#4ade80' : '#f87171';
+            chpPlanStr = `<span style="color:${cc}">${chpPlanCost.toLocaleString()}</span>`;
+        }
+
+        // CHP기준 단가: 100% 부하 기준, 항상 표시
+        let chpRefStr = '-';
+        if (chp100 && chp100.열Gcal > 0) {
+            const fuelH = chp100.ngNm3 * ngCostNm3;
+            const revH = h.mp * chp100.송전MW * 1000;
+            const chpRefCost = Math.round((fuelH - revH) / chp100.열Gcal);
+            const cc = chpRefCost < 0 ? '#86efac' : '#fca5a5';
+            chpRefStr = `<span style="color:${cc}">${chpRefCost.toLocaleString()}</span>`;
+        }
+
+        // PLB계획 단가: 가동시만
+        const plbPlanStr = h.plb > 0 ? `<span style="color:${plbUnitCost < 0 ? '#4ade80' : '#f87171'}">${plbUnitCost.toLocaleString()}</span>` : '-';
+
+        // PLB기준 단가: 100% 부하 기준, 항상 표시
+        const plbRefStr = plbRefCost > 0 ? `<span style="color:#fca5a5">${plbRefCost.toLocaleString()}</span>` : '-';
+
+        html += `<tr style="border-bottom:1px solid #1a1a2e">`;
+        html += `<td style="padding:2px 4px;text-align:center;color:#8888aa">${i + 1}시</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${(h.demand || 0).toFixed(1)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${(h.ext || 0).toFixed(1)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right;color:#3b82f6">${(h.chp || 0).toFixed(1)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right;color:#f59e0b">${(h.plb || 0).toFixed(1)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${h.storage}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right;color:${diffColor}">${diff > 0 ? '+' : ''}${Math.round(diff)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right;color:#e2e8f0">${Math.round(h.smp || 0)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right;color:#a78bfa">${Math.round(h.mp || 0)}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${chpPlanStr}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${chpRefStr}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${plbPlanStr}</td>`;
+        html += `<td style="padding:2px 4px;text-align:right">${plbRefStr}</td>`;
+        html += `</tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
 function showDayDetailModal(simResults, dayIndex) {
     _dayDetailSimResults = simResults;
     _dayDetailCurrentIndex = dayIndex;
@@ -5345,6 +5805,7 @@ function showDayDetailModal(simResults, dayIndex) {
     }
 
     // ── 최초 모달 생성 (한 번만) ──
+    _dayDetailViewMode = 'graph';
     if (_dayDetailChart) { _dayDetailChart.destroy(); _dayDetailChart = null; }
 
     const overlay = document.createElement('div');
@@ -5362,8 +5823,15 @@ function showDayDetailModal(simResults, dayIndex) {
     html += '<span id="ddm_badge" class="day-modal-badge"></span>';
     html += '<button id="ddm_nextBtn" class="day-nav-btn" title="다음일 (→)">\u25B6</button>';
     html += '</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center">';
+    html += '<button id="ddm_backBtn" class="day-nav-btn" title="그래프로 돌아가기" style="font-size:11px;padding:5px 14px;border-radius:6px;white-space:nowrap;display:none">그래프</button>';
+    html += '<button id="ddm_dataBtn" class="day-nav-btn" title="데이터 보기" style="font-size:11px;padding:5px 20px;border-radius:6px;white-space:nowrap">데이터</button>';
     html += '<button class="day-close-btn" title="닫기 (ESC)">\u2715</button>';
     html += '</div>';
+    html += '</div>';
+
+    // ── 그래프 뷰 (기본 표시) ──
+    html += '<div id="ddm_graphView">';
 
     // 요약 칩 (컨테이너만, 내용은 업데이트)
     html += '<div id="ddm_chips" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap"></div>';
@@ -5383,6 +5851,17 @@ function showDayDetailModal(simResults, dayIndex) {
     html += '<div id="ddm_smpVals" style="display:flex;position:relative"></div>';
     html += '</div>';
 
+    html += '</div>'; // ddm_graphView 끝
+
+    // ── 데이터 뷰 (숨김, 전환 시 표시) ──
+    html += '<div id="ddm_dataView" style="display:none">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    html += '<span style="color:#8b5cf6;font-weight:700">시간별 데이터</span>';
+    html += '<button id="ddm_copyBtn" style="font-size:10px;padding:3px 8px;background:#1e1e3a;color:#c4b5fd;border:1px solid #8b5cf6;border-radius:4px;cursor:pointer">JSON 복사</button>';
+    html += '</div>';
+    html += '<div id="ddm_dataTable" style="overflow-x:auto"></div>';
+    html += '</div>';
+
     html += '</div>'; // modal-box
     overlay.innerHTML = html;
     document.body.appendChild(overlay);
@@ -5395,6 +5874,55 @@ function showDayDetailModal(simResults, dayIndex) {
         if (_dayDetailCurrentIndex < _dayDetailSimResults.length - 1) _updateDayDetailContent(_dayDetailCurrentIndex + 1);
     });
     overlay.querySelector('.day-close-btn').addEventListener('click', closeDayDetail);
+
+    // 뷰 전환: 데이터 버튼
+    document.getElementById('ddm_dataBtn').addEventListener('click', () => {
+        _dayDetailViewMode = 'data';
+        document.getElementById('ddm_graphView').style.display = 'none';
+        document.getElementById('ddm_dataView').style.display = 'block';
+        document.getElementById('ddm_dataBtn').style.display = 'none';
+        document.getElementById('ddm_backBtn').style.display = '';
+        _updateDataPanel();
+    });
+
+    // 뷰 전환: ← 그래프 버튼
+    document.getElementById('ddm_backBtn').addEventListener('click', () => {
+        _dayDetailViewMode = 'graph';
+        document.getElementById('ddm_graphView').style.display = '';
+        document.getElementById('ddm_dataView').style.display = 'none';
+        document.getElementById('ddm_dataBtn').style.display = '';
+        document.getElementById('ddm_backBtn').style.display = 'none';
+    });
+
+    // 복사 (분석용 컴팩트 포맷 — 기준단가 포함)
+    document.getElementById('ddm_copyBtn').addEventListener('click', () => {
+        const r = _dayDetailSimResults[_dayDetailCurrentIndex];
+        const chpFuelPerH = r.chpHours > 0 ? r.chpFuelCost / r.chpHours : 0;
+        const chpHeatPerH = r.chpHours > 0 ? r.chpHeat / r.chpHours : 0;
+        const plbUnitCost = r.plbHeat > 0 ? Math.round(r.plbFuelCost / r.plbHeat) : 0;
+        const chpLT = getChpLoadTable();
+        const chp100 = chpLT.length > 0 ? chpLT[0] : null;
+        const ngCost = r.ngCostNm3 || 0;
+        const plbRef = r.plbRefCostPerGcal || 0;
+        let txt = `${r.month}/${r.day}(${r.dowName}) ${r.dayType} | 수요${Math.round(r.demand)} 외부${Math.round(r.adjExternal)} 인테코${Math.round(r.adjIntecoNet)} | CHP ${r.chpHours}h(${r.chpLoad}%) ${Math.round(r.chpHeat)}Gcal | PLB ${r.plbUnits}대${r.plbHours}h ${Math.round(r.plbHeat)}Gcal | 축열조 ${r.storageStart}→${r.storageLevel} | 기동비${(r.startupCost||0).toLocaleString()}\n`;
+        txt += `시 |수요  |외부 |CHP  |PLB  |축열조|축방열|MP |CHP계획|CHP기준|PLB계획|PLB기준\n`;
+        for (let i = 0; i < r.hourly.length; i++) {
+            const h = r.hourly[i];
+            const prev = i === 0 ? (r.storageStart ?? 0) : r.hourly[i-1].storage;
+            const diff = h.storage - prev;
+            // CHP계획
+            let chpPlan = '-';
+            if (h.chp > 0 && chpHeatPerH > 0) { chpPlan = Math.round((chpFuelPerH - h.mp * (h.chpPowerKWh || 0)) / h.chp); }
+            // CHP기준
+            let chpRefV = '-';
+            if (chp100 && chp100.열Gcal > 0) { chpRefV = Math.round((chp100.ngNm3 * ngCost - h.mp * chp100.송전MW * 1000) / chp100.열Gcal); }
+            // PLB계획
+            const plbPlan = h.plb > 0 ? plbUnitCost : '-';
+            txt += `${String(i+1).padStart(2)}시|${String((h.demand||0).toFixed(1)).padStart(6)}|${String((h.ext||0).toFixed(1)).padStart(5)}|${String((h.chp||0).toFixed(1)).padStart(5)}|${String((h.plb||0).toFixed(1)).padStart(5)}|${String(h.storage).padStart(6)}|${(diff>=0?'+':'')+Math.round(diff).toString().padStart(diff>=0?5:4)}|${String(Math.round(h.mp||0)).padStart(3)}|${String(chpPlan).padStart(7)}|${String(chpRefV).padStart(7)}|${String(plbPlan).padStart(7)}|${String(plbRef).padStart(7)}\n`;
+        }
+        navigator.clipboard.writeText(txt)
+            .then(() => { document.getElementById('ddm_copyBtn').textContent = '복사됨!'; setTimeout(() => { document.getElementById('ddm_copyBtn').textContent = 'JSON 복사'; }, 1500); });
+    });
 
     // 키보드 (전역, 모달 열려있는 동안)
     document.addEventListener('keydown', _dayDetailKeyHandler);
@@ -5421,7 +5949,7 @@ function showDayDetailModal(simResults, dayIndex) {
         type: 'bar',
         plugins: [smpAlignPlugin],
         data: {
-            labels: Array.from({ length: 24 }, (_, i) => `${i}시`),
+            labels: Array.from({ length: 24 }, (_, i) => `${i + 1}시`),
             datasets: [
                 {
                     label: '축열조', type: 'bar',
@@ -5448,15 +5976,15 @@ function showDayDetailModal(simResults, dayIndex) {
                     label: 'CHP', type: 'line',
                     data: hours.map(h => Math.round(h.chp * 10) / 10),
                     borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)',
-                    borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#42a5f5',
-                    fill: false, yAxisID: 'y', order: 2, stepped: 'before',
+                    borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#42a5f5',
+                    fill: false, yAxisID: 'y', order: 2,
                 },
                 {
                     label: 'PLB', type: 'line',
                     data: hours.map(h => Math.round(h.plb * 10) / 10),
                     borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',
-                    borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#f59e0b',
-                    fill: false, yAxisID: 'y', order: 3, stepped: 'before',
+                    borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#f59e0b',
+                    fill: false, yAxisID: 'y', order: 3,
                 },
             ]
         },

@@ -308,11 +308,11 @@
     <div class="step-panel" id="step_startup">
         <h3>기동/정지 조건</h3>
         <table class="settings-tbl">
-            <thead><tr><th>구분</th><th>정지 시간 기준</th><th>기동 소요시간(h)</th><th>기동 가스사용량(Nm³/h)</th></tr></thead>
+            <thead><tr><th>구분</th><th>정지 시간 기준</th><th>총 기동 가스사용량(Nm³)</th></tr></thead>
             <tbody>
-                <tr><td>Hot Start</td><td>~8시간</td><td><input type="text" id="hotTime" value="4"></td><td><input type="text" id="hotGasRate" value="300"></td></tr>
-                <tr><td>Warm Start</td><td>8~48시간</td><td><input type="text" id="warmTime" value="6"></td><td><input type="text" id="warmGasRate" value="350"></td></tr>
-                <tr><td>Cold Start</td><td>48시간+</td><td><input type="text" id="coldTime" value="8"></td><td><input type="text" id="coldGasRate" value="400"></td></tr>
+                <tr><td>Hot Start</td><td>~8시간</td><td><input type="text" id="hotGasTotal" value="400"></td></tr>
+                <tr><td>Warm Start</td><td>8~48시간</td><td><input type="text" id="warmGasTotal" value="750"></td></tr>
+                <tr><td>Cold Start</td><td>48시간+</td><td><input type="text" id="coldGasTotal" value="1500"></td></tr>
             </tbody>
         </table>
         <div style="font-size:11px;font-weight:600;color:#475569;margin-top:14px">CHP</div>
