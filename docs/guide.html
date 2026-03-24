@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>위드시뮬 시스템 가이드</title>
+<style>
+/* ── 기본 리셋 & 다크 테마 ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --bg: #181c25;
+    --bg-card: #1e2330;
+    --bg-card-hover: #242a3a;
+    --border: #2d3548;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #8b5cf6;
+    --accent-dim: rgba(139,92,246,0.15);
+    --blue: #3b82f6;
+    --green: #22c55e;
+    --cyan: #06b6d4;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --pink: #ec4899;
+}
+html { scroll-behavior: smooth; }
+body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+}
+
+/* ── 레이아웃 ── */
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: #141820;
+    padding: 24px 0;
+    z-index: 100;
+}
+.main { flex: 1; max-width: 900px; margin: 0 auto; padding: 40px 48px 80px; }
+
+/* ── 헤더 ── */
+.header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+}
+.header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #f1f5f9;
+    margin-bottom: 8px;
+}
+.header p { color: var(--text-dim); font-size: 14px; }
+.header .meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.header .meta span {
+    background: rgba(51,65,85,0.4);
+    padding: 4px 12px;
+    border-radius: 6px;
+}
+
+/* ── 사이드바 네비게이션 ── */
+.sidebar-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    padding: 0 20px;
+    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.nav-list { list-style: none; }
+.nav-list li a {
+    display: block;
+    padding: 8px 20px;
+    font-size: 13px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: all 0.2s;
+}
+.nav-list li a:hover {
+    color: var(--text);
+    background: rgba(139,92,246,0.08);
+    border-left-color: var(--accent);
+}
+.nav-list li a.sub {
+    padding-left: 36px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.nav-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 20px;
+}
+
+/* ── 섹션 ── */
+.section { margin-bottom: 56px; }
+.section h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #f1f5f9;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--accent);
+    display: inline-block;
+}
+.section h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #cbd5e1;
+    margin: 28px 0 12px;
+}
+.section p, .section li {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.85;
+}
+.section ul, .section ol {
+    padding-left: 20px;
+    margin: 8px 0;
+}
+
+/* ── 카드 ── */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    transition: background 0.2s;
+}
+.card:hover { background: var(--bg-card-hover); }
+.card-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+/* ── 파이프라인 흐름도 ── */
+.pipeline-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 24px 0;
+    padding: 24px;
+    background: rgba(30,35,48,0.6);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+}
+.pipe-box {
+    flex: 0 0 auto;
+    text-align: center;
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 1.5px solid;
+    min-width: 100px;
+    transition: transform 0.2s;
+}
+.pipe-box:hover { transform: translateY(-2px); }
+.pipe-box .num {
+    font-size: 20px;
+    font-weight: 900;
+    margin-bottom: 4px;
+}
+.pipe-box .label {
+    font-size: 12px;
+    font-weight: 600;
+}
+.pipe-box .desc {
+    font-size: 10px;
+    margin-top: 4px;
+    opacity: 0.7;
+}
+.pipe-arrow {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font-size: 20px;
+    padding: 0 6px;
+    line-height: 1;
+}
+
+/* ── MPC 단계 카드 ── */
+.mpc-grid {
+    display: grid;
+    gap: 16px;
+    margin: 20px 0;
+}
+.mpc-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 18px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    border-left: 3px solid;
+    transition: background 0.2s;
+}
+.mpc-step:hover { background: var(--bg-card-hover); }
+.mpc-step .step-num {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 16px;
+    color: #fff;
+}
+.mpc-step .step-body { flex: 1; }
+.mpc-step .step-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.mpc-step .step-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.8;
+}
+.mpc-step .io-box {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 11px;
+}
+.mpc-step .io-box > div {
+    padding: 6px 10px;
+    border-radius: 6px;
+    flex: 1;
+}
+.io-in { background: rgba(59,130,246,0.1); color: #93c5fd; border: 1px solid rgba(59,130,246,0.2); }
+.io-out { background: rgba(34,197,94,0.1); color: #86efac; border: 1px solid rgba(34,197,94,0.2); }
+
+/* ── 데이터 흐름 ── */
+.data-flow-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+}
+.data-item {
+    padding: 16px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    border-left: 3px solid;
+}
+.data-item .di-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.data-item .di-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.7;
+}
+.data-item .di-usage {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+}
+
+/* ── 테이블 ── */
+.guide-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+}
+.guide-table th {
+    background: rgba(139,92,246,0.12);
+    color: #c4b5fd;
+    font-weight: 700;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--accent);
+    font-size: 12px;
+    white-space: nowrap;
+}
+.guide-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    vertical-align: top;
+}
+.guide-table tr:hover td { background: rgba(139,92,246,0.04); }
+.guide-table .fn { font-family: 'SF Mono', 'Consolas', monospace; font-size: 12px; color: #93c5fd; }
+.guide-table .warn { color: #fbbf24; font-size: 12px; }
+
+/* ── 용어 사전 ── */
+.term-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+}
+.term-item {
+    padding: 14px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.term-item dt {
+    font-size: 14px;
+    font-weight: 700;
+    color: #c4b5fd;
+    margin-bottom: 4px;
+}
+.term-item dd {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.7;
+}
+
+/* ── 접기/펼치기 ── */
+details {
+    margin: 12px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+details summary {
+    padding: 12px 18px;
+    background: var(--bg-card);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: #cbd5e1;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+details summary::before {
+    content: '\25B6';
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+details[open] summary::before { transform: rotate(90deg); }
+details summary:hover { background: var(--bg-card-hover); }
+details > div, details > p {
+    padding: 16px 18px;
+    background: var(--bg);
+}
+
+/* ── 주석 박스 ── */
+.note {
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.75;
+    margin: 12px 0;
+}
+.note-info { background: rgba(59,130,246,0.08); border-left: 3px solid var(--blue); color: #93c5fd; }
+.note-warn { background: rgba(245,158,11,0.08); border-left: 3px solid var(--amber); color: #fcd34d; }
+.note-tip { background: rgba(139,92,246,0.08); border-left: 3px solid var(--accent); color: #c4b5fd; }
+
+/* ── 로드맵 타임라인 ── */
+.timeline {
+    position: relative;
+    padding-left: 32px;
+    margin: 20px 0;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+}
+.tl-item {
+    position: relative;
+    margin-bottom: 24px;
+}
+.tl-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 6px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid;
+}
+.tl-item .tl-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.tl-item .tl-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.75;
+}
+
+/* ── 반응형 ── */
+@media (max-width: 1100px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px 60px; }
+}
+@media (max-width: 700px) {
+    .pipeline-flow { flex-direction: column; align-items: stretch; }
+    .pipe-arrow { transform: rotate(90deg); text-align: center; }
+    .data-flow-grid, .term-grid { grid-template-columns: 1fr; }
+    .mpc-step .io-box { flex-direction: column; }
+}
+
+/* ── 인쇄 ── */
+@media print {
+    body { background: #fff; color: #1e293b; font-size: 12px; }
+    .sidebar { display: none; }
+    .main { max-width: 100%; padding: 20px; }
+    .card, .mpc-step, .data-item, details, .term-item {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        break-inside: avoid;
+    }
+    .guide-table th { background: #f1f5f9; color: #334155; }
+    .guide-table td { color: #475569; }
+    .pipeline-flow { background: #f8fafc; border-color: #e2e8f0; }
+    .pipe-box { color: #334155 !important; }
+    .note { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    h2 { border-bottom-color: #6d28d9 !important; }
+    a { color: #1e40af; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+<!-- ─── 좌측 목차 네비게이션 ─── -->
+<nav class="sidebar">
+    <div class="sidebar-title">시스템 가이드</div>
+    <ul class="nav-list">
+        <li><a href="#overview">1. 전체 흐름 한눈에 보기</a></li>
+        <li><a href="#overview-pipeline" class="sub">파이프라인 6단계</a></li>
+        <li><a href="#overview-files" class="sub">주요 파일 구조</a></li>
+        <div class="nav-sep"></div>
+        <li><a href="#mpc">2. 최적화(MPC) 작동 원리</a></li>
+        <li><a href="#mpc-concept" class="sub">MPC 개념</a></li>
+        <li><a href="#mpc-steps" class="sub">매일 반복하는 7단계</a></li>
+        <div class="nav-sep"></div>
+        <li><a href="#dataflow">3. 데이터 흐름도</a></li>
+        <li><a href="#dataflow-input" class="sub">입력 데이터</a></li>
+        <li><a href="#dataflow-pricing" class="sub">단가/요금 데이터</a></li>
+        <li><a href="#dataflow-mapping" class="sub">데이터-단계 매핑</a></li>
+        <div class="nav-sep"></div>
+        <li><a href="#change">4. 변경 가이드</a></li>
+        <div class="nav-sep"></div>
+        <li><a href="#roadmap">5. 30년 확장 로드맵</a></li>
+        <div class="nav-sep"></div>
+        <li><a href="#glossary">6. 용어 사전</a></li>
+    </ul>
+</nav>
+
+<!-- ─── 메인 콘텐츠 ─── -->
+<div class="main">
+
+<div class="header">
+    <h1>위드시뮬 시스템 가이드</h1>
+    <p>위드인천에너지 CHP 보일러 기동계획 시뮬레이터 &mdash; 내부 구조 및 변경 안내서</p>
+    <div class="meta">
+        <span>버전 v5.3</span>
+        <span>최종 갱신 2026-03-20</span>
+        <span>js/app.js 기준 (~6,300줄)</span>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     1. 전체 흐름 한눈에 보기
+     ═══════════════════════════════════════════════════ -->
+<div class="section" id="overview">
+<h2>1. 전체 흐름 한눈에 보기</h2>
+
+<p>시뮬레이터는 6단계 파이프라인으로 구성됩니다. 앞 단계가 완료되어야 다음 단계가 활성화되며,
+각 단계의 결과가 다음 단계의 입력이 됩니다.</p>
+
+<div class="pipeline-flow" id="overview-pipeline">
+    <div class="pipe-box" style="border-color:#8b5cf6; color:#c4b5fd;">
+        <div class="num">1</div>
+        <div class="label">데이터</div>
+        <div class="desc">Excel 업로드</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-box" style="border-color:#3b82f6; color:#93c5fd;">
+        <div class="num">2</div>
+        <div class="label">설정</div>
+        <div class="desc">기기/축열조/정비</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-box" style="border-color:#06b6d4; color:#67e8f9;">
+        <div class="num">3</div>
+        <div class="label">데이터 산출</div>
+        <div class="desc">MP/용량요금/열비용</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-box" style="border-color:#22c55e; color:#86efac;">
+        <div class="num">4</div>
+        <div class="label">기동계획</div>
+        <div class="desc">MPC 최적화 실행</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-box" style="border-color:#f59e0b; color:#fcd34d;">
+        <div class="num">5</div>
+        <div class="label">비용산출</div>
+        <div class="desc">전력비/가스비 등</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-box" style="border-color:#ef4444; color:#fca5a5;">
+        <div class="num">6</div>
+        <div class="label">운영손익</div>
+        <div class="desc">공헌이익 종합</div>
+    </div>
+</div>
+
+<h3>각 단계 설명</h3>
+
+<div class="card">
+    <div class="card-title" style="color:#c4b5fd;">1단계: 데이터 입력</div>
+    <p>SMP(시간별), 판매실적, 외부거래, 용수약품, 공휴일, 전력수급 데이터와
+    단가/요금 테이블(CP, NG단가, 전기요금, 열요금, 수도/약품단가 등)을 Excel로 일괄 업로드하거나 개별 입력합니다.
+    필수 데이터: SMP, 외부거래, NG단가, CP/TLF.</p>
+</div>
+<div class="card">
+    <div class="card-title" style="color:#93c5fd;">2단계: 설정</div>
+    <p>CHP 성능표(부하별 열/전기/가스), PLB 성능표, 축열조(용량/초기잔량/최소유지), 기동조건(Hot/Warm/Cold),
+    정비일정, 외부수열원 레지스트리, 단가산정 계수, 전력수요 패턴(월별 평균kW + 24시간 패턴) 등
+    8개 스텝으로 나뉘어 설정합니다.</p>
+</div>
+<div class="card">
+    <div class="card-title" style="color:#67e8f9;">3단계: 데이터 산출</div>
+    <p>입력 데이터와 설정을 결합하여 중간 계산을 수행합니다.
+    MP(정산가격) = SMP x TLF + 무부하비정산, 일별 용량요금(CP), 외부수열비용, 열판매수입, 용수약품비가 산출됩니다.
+    함수: <code>runAllCalc</code> &rarr; <code>calculateMP</code>, <code>calculateCapacityCharge</code>,
+    <code>calculateExternalHeatCost</code>, <code>calculateHeatSalesRevenue</code>, <code>calculateWaterChem</code>.</p>
+</div>
+<div class="card">
+    <div class="card-title" style="color:#86efac;">4단계: 기동계획 (최적화)</div>
+    <p>365일 각각에 대해 CHP 가동시간/부하율을 결정하는 핵심 단계입니다.
+    MPC(Model Predictive Control) 방식으로 매일 30일 앞을 DP로 탐색한 후
+    오늘의 결정만 확정하고, 내일 다시 계산합니다.
+    함수: <code>solveMPC</code> (동기), <code>solveMPCAsync</code> (비동기).</p>
+</div>
+<div class="card">
+    <div class="card-title" style="color:#fcd34d;">5단계: 비용산출</div>
+    <p>최적화 결과를 바탕으로 전력비(기본료/수전요금/기후환경/연료비/전력기금), 가스비, 용수약품비, 수열비를
+    월별/연간으로 집계합니다. 함수: <code>renderAllCosts</code>.</p>
+</div>
+<div class="card">
+    <div class="card-title" style="color:#fca5a5;">6단계: 운영손익</div>
+    <p>수입(전력판매 + 용량요금 + 열판매)에서 비용(연료비 + 기동비 + 수열비 등)을 차감하여
+    공헌이익을 산출합니다. 월별 차트와 일별 상세 보기를 제공합니다.
+    함수: <code>renderContribution</code>.</p>
+</div>
+
+<h3 id="overview-files">주요 파일 구조</h3>
+<table class="guide-table">
+<thead><tr><th>파일</th><th>역할</th><th>규모</th></tr></thead>
+<tbody>
+<tr><td class="fn">js/app.js</td><td>전체 로직: 최적화 엔진, UI 렌더, 데이터 관리, 비용 계산</td><td>~6,300줄</td></tr>
+<tr><td class="fn">index.html</td><td>UI 구조: 타이틀바, 파이프라인, 탭, 설정 폼</td><td>-</td></tr>
+<tr><td class="fn">css/style.css</td><td>다크 테마, 커스텀 타이틀바, 워크플로우 오버레이</td><td>-</td></tr>
+<tr><td class="fn">app.py</td><td>pywebview 실행 (frameless 윈도우)</td><td>-</td></tr>
+<tr><td class="fn">docs/flowchart.html</td><td>최적화 로직 흐름도 (기본/정밀 탭)</td><td>-</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     2. 최적화(MPC) 작동 원리
+     ═══════════════════════════════════════════════════ -->
+<div class="section" id="mpc">
+<h2>2. 최적화(MPC) 작동 원리</h2>
+
+<div class="card" id="mpc-concept">
+    <div class="card-title" style="color:#c4b5fd;">MPC란?</div>
+    <p>Model Predictive Control. 내비게이션에 비유하면: <strong>"목적지까지 30km 앞을 보고 지금 어느 길로 갈지 결정하되,
+    1km 가면 다시 30km 앞을 보고 다시 판단하는 것"</strong>입니다.</p>
+    <p style="margin-top:8px;">위드시뮬에서는 <strong>오늘부터 30일 앞</strong>까지를 DP(동적 계획법)로 분석하여
+    가장 비용이 적은 경로를 찾되, <strong>오늘 결정만 확정</strong>합니다.
+    내일은 실제 축열조 잔량을 기준으로 다시 30일 앞을 탐색합니다.
+    이렇게 365일을 하루씩 진행하면 1년 전체 계획이 만들어집니다.</p>
+    <div class="note note-info" style="margin-top:12px;">
+        전체 365일을 한 번에 보는 DP(solveDP)도 있지만, MPC가 실시간 축열조 상태를 반영하므로 더 정확합니다.
+        현재 정밀 최적화는 MPC 방식을 사용합니다.
+    </div>
+</div>
+
+<h3 id="mpc-steps">매일 반복하는 7단계</h3>
+<p>MPC 루프 안에서 하루마다 아래 7단계가 순서대로 실행됩니다. 함수 <code>solveMPC</code> 내부 구조입니다.</p>
+
+<div class="mpc-grid">
+    <!-- Step 1 -->
+    <div class="mpc-step" style="border-left-color:#8b5cf6;">
+        <div class="step-num" style="background:#8b5cf6;">1</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#c4b5fd;">데이터 준비</div>
+            <div class="step-desc">
+                365일 전체의 일별 데이터를 미리 구성합니다.
+                수요(시간별), 외부수열, SMP/MP, NG단가, 공휴일, 정비일 등을 하나의 배열로 통합합니다.
+                각 날의 CHP 부하별 비용(연료비 - 전기수익)도 사전 계산합니다.
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> DATA 객체(전체 엑셀 데이터), 설정값</div>
+                <div class="io-out"><strong>출력:</strong> dayInfo 배열 (365개, 날별 모든 정보 포함)</div>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">관련: <code>buildDailyData</code></div>
+        </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="mpc-step" style="border-left-color:#06b6d4;">
+        <div class="step-num" style="background:#06b6d4;">2</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#67e8f9;">사전검증 (overflow 방지)</div>
+            <div class="step-desc">
+                현재 축열조 잔량에서 CHP를 가동했을 때 축열조가 넘치지 않는 <strong>최대 안전 가동시간</strong>을 계산합니다.
+                24시간부터 역순으로 줄여가며, 어떤 시작시간이든 overflow가 없는 시간을 찾습니다.
+                이 값이 DP 탐색의 상한이 됩니다.
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> 현재 축열조 잔량, 일별 수요 패턴, CHP 열출력</div>
+                <div class="io-out"><strong>출력:</strong> 날/잔량별 최대 안전 시간 (0~24)</div>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">관련: <code>calcMaxSafeHours</code></div>
+        </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="mpc-step" style="border-left-color:#3b82f6;">
+        <div class="step-num" style="background:#3b82f6;">3</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#93c5fd;">역방향 DP (30일 윈도우)</div>
+            <div class="step-desc">
+                오늘부터 30일(horizon) 범위에서, 마지막 날부터 오늘로 거꾸로 계산합니다.
+                각 날/축열조 잔량/정지 상태 조합마다 "CHP를 몇 시간, 어느 부하로 돌려야 향후 총비용이 최소인가"를 구합니다.
+                상태 공간: 축열조(10Gcal 단위) x 정지레벨(4단계: ON/Hot/Warm/Cold).
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> dayInfo, 사전검증 결과, DP 상태공간</div>
+                <div class="io-out"><strong>출력:</strong> 오늘의 최적 결정 테이블 (잔량x정지레벨 &rarr; 시간+부하)</div>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">관련: DP 역방향 루프 (Bellman Equation)</div>
+        </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="mpc-step" style="border-left-color:#22c55e;">
+        <div class="step-num" style="background:#22c55e;">4</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#86efac;">결정 추출</div>
+            <div class="step-desc">
+                현재 실제 축열조 잔량과 CHP 정지 상태를 기반으로, DP 결과 테이블에서 오늘의 최적 결정을 꺼냅니다.
+                결과: "CHP 18시간, 80% 부하" 또는 "CHP 0시간(정지)" 등.
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> 실제 축열조 잔량, 정지레벨, DP 결정 테이블</div>
+                <div class="io-out"><strong>출력:</strong> 오늘의 CHP 가동시간, 부하율</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="mpc-step" style="border-left-color:#f59e0b;">
+        <div class="step-num" style="background:#f59e0b;">5</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#fcd34d;">블록 배치 (Stage 2)</div>
+            <div class="step-desc">
+                결정된 가동시간을 하루 24시간 중 <strong>어디에 배치할지</strong> 정합니다.
+                MP(전력 판매가)가 높은 시간대에 CHP를 가동하면 수익이 극대화됩니다.
+                모든 시작시간을 시뮬레이션하여, overflow 없이 MP 합계가 최대인 배치를 선택합니다.
+                전날과의 연속성(최소정지시간)도 체크합니다.
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> CHP 시간/부하, 시간별 MP, 축열조 잔량</div>
+                <div class="io-out"><strong>출력:</strong> CHP 시작시각 (예: 6시~24시)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="mpc-step" style="border-left-color:#ec4899;">
+        <div class="step-num" style="background:#ec4899;">6</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#f9a8d4;">PLB 판단 (Stage 3)</div>
+            <div class="step-desc">
+                CHP 배치 결과로 시간별 축열조를 시뮬레이션하여, 최소 잔량 아래로 떨어지는 시점이 있는지 확인합니다.
+                부족하면 보조보일러(PLB)를 부족 시점 직전에 투입합니다.
+                대수(최대 3대)와 가동시간은 부족분 기반으로 자동 계산됩니다.
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> CHP 블록 배치, 시간별 수요/외부수열</div>
+                <div class="io-out"><strong>출력:</strong> PLB 대수, 시간, 시작시각 (또는 미투입)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="mpc-step" style="border-left-color:#ef4444;">
+        <div class="step-num" style="background:#ef4444;">7</div>
+        <div class="step-body">
+            <div class="step-title" style="color:#fca5a5;">시간별 시뮬 (Stage 4)</div>
+            <div class="step-desc">
+                0시부터 23시까지 한 시간씩 실제 운전을 시뮬레이션합니다.
+                매 시간: 축열조 = 이전잔량 + 외부수열 + CHP열 + PLB열 - 수요.
+                상한/하한 제약 적용, 시간별 전기 수익(MP x 발전MW) 계산.
+                이 날의 마지막 축열조 잔량이 내일 MPC 루프의 시작값이 됩니다.
+            </div>
+            <div class="io-box">
+                <div class="io-in"><strong>입력:</strong> CHP 블록, PLB 블록, 시간별 수요/외부수열</div>
+                <div class="io-out"><strong>출력:</strong> 24시간 상세 기록 (열/전력/축열조/비용), 일별 집계</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="note note-tip">
+    이 7단계가 365일 동안 반복됩니다. 전체 소요시간은 약 3~10초이며,
+    UI에서는 워크플로우 오버레이로 진행 상태를 시각화합니다.
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     3. 데이터 흐름도
+     ═══════════════════════════════════════════════════ -->
+<div class="section" id="dataflow">
+<h2>3. 데이터 흐름도</h2>
+
+<p>시뮬레이터에 입력되는 데이터는 크게 <strong>입력 데이터</strong>(실적/시장)와 <strong>단가/요금 데이터</strong>로 나뉩니다.
+모든 데이터는 전역 <code>DATA</code> 객체에 저장되며, 설정값은 DOM 요소에서 직접 읽습니다.</p>
+
+<h3 id="dataflow-input">입력 데이터</h3>
+<div class="data-flow-grid">
+    <div class="data-item" style="border-left-color:#ef4444;">
+        <div class="di-title" style="color:#fca5a5;">SMP 시간별</div>
+        <div class="di-desc">계통한계가격. 365일 x 24시간. 전기 판매가의 기준.</div>
+        <div class="di-usage">사용: MP산출, DP비용계산, 블록배치</div>
+    </div>
+    <div class="data-item" style="border-left-color:#22c55e;">
+        <div class="di-title" style="color:#86efac;">판매실적 (시간별)</div>
+        <div class="di-desc">용도별 열 판매량(주택/업무/공공). 시간별 수요 패턴의 원천.</div>
+        <div class="di-usage">사용: buildDailyData의 수요 계산</div>
+    </div>
+    <div class="data-item" style="border-left-color:#3b82f6;">
+        <div class="di-title" style="color:#93c5fd;">외부거래 (일별)</div>
+        <div class="di-desc">외부수열원별 일별 수열량 (남부소각장, ERG, SRF, 인테코, 안산 등).</div>
+        <div class="di-usage">사용: buildDailyData의 외부수열 계산, 수열비용</div>
+    </div>
+    <div class="data-item" style="border-left-color:#f59e0b;">
+        <div class="di-title" style="color:#fcd34d;">용수약품 (일별)</div>
+        <div class="di-desc">용수사용량(m3), 약품별 사용량(Kg). 비용산출의 입력.</div>
+        <div class="di-usage">사용: calculateWaterChem</div>
+    </div>
+    <div class="data-item" style="border-left-color:#8b5cf6;">
+        <div class="di-title" style="color:#c4b5fd;">공휴일</div>
+        <div class="di-desc">월/일/요일/공휴일여부. TLF 선택과 요일구분에 사용.</div>
+        <div class="di-usage">사용: MP산출, buildDailyData</div>
+    </div>
+    <div class="data-item" style="border-left-color:#06b6d4;">
+        <div class="di-title" style="color:#67e8f9;">전력수급 (시간별)</div>
+        <div class="di-desc">용량(capacity), 급전(dispatch), 열제약(heat_constraint). 시간별 데이터.</div>
+        <div class="di-usage">사용: 전력비 계산, 계획수전 산출</div>
+    </div>
+</div>
+
+<h3 id="dataflow-pricing">단가/요금 데이터</h3>
+<div class="data-flow-grid">
+    <div class="data-item" style="border-left-color:#a78bfa;">
+        <div class="di-title" style="color:#c4b5fd;">CP/TLF (월별)</div>
+        <div class="di-desc">평일CP, 휴일CP, 평일/토요일/공휴일 TLF(손실보전계수).</div>
+        <div class="di-usage">사용: MP산출(SMP x TLF), 용량요금 계산</div>
+    </div>
+    <div class="data-item" style="border-left-color:#f59e0b;">
+        <div class="di-title" style="color:#fcd34d;">NG단가 (월별)</div>
+        <div class="di-desc">NG단위열량, 부과금/부담금, CHP/PLB/FC 열량단가(원/MJ).</div>
+        <div class="di-usage">사용: CHP/PLB 연료비 계산 (DP 비용함수의 핵심)</div>
+    </div>
+    <div class="data-item" style="border-left-color:#3b82f6;">
+        <div class="di-title" style="color:#93c5fd;">전기요금표 (월별x시간별)</div>
+        <div class="di-desc">평일/토요일/공휴일별 시간대별 전기요금. 기본료, 기후환경, 연료비, 전력기금.</div>
+        <div class="di-usage">사용: 전력비(수전요금) 계산</div>
+    </div>
+    <div class="data-item" style="border-left-color:#22c55e;">
+        <div class="di-title" style="color:#86efac;">열요금표 / 수도약품단가 (월별)</div>
+        <div class="di-desc">열 판매 단가(주택/업무/공공), 수도요금 구간별, 약품별 단가.</div>
+        <div class="di-usage">사용: 열판매수입, 용수약품비 계산</div>
+    </div>
+</div>
+
+<h3 id="dataflow-mapping">데이터가 최적화의 어느 단계에서 사용되는지</h3>
+<details>
+    <summary>데이터-단계 매핑 상세표</summary>
+    <div>
+    <table class="guide-table">
+    <thead><tr><th>데이터</th><th>buildDailyData</th><th>DP 비용함수</th><th>블록배치</th><th>PLB판단</th><th>시간별시뮬</th><th>비용산출</th></tr></thead>
+    <tbody>
+    <tr><td>SMP 시간별</td><td>O (MP 산출)</td><td>O (MP 평균)</td><td>O (MP 최대 시간대)</td><td>-</td><td>O (전기수익)</td><td>-</td></tr>
+    <tr><td>판매실적(수요)</td><td>O (시간별 합산)</td><td>O (netRequired)</td><td>-</td><td>O (축열조 시뮬)</td><td>O (매시간)</td><td>-</td></tr>
+    <tr><td>외부거래</td><td>O (일별 합산)</td><td>O (netRequired 차감)</td><td>O (시간균등)</td><td>O (축열조 시뮬)</td><td>O (매시간)</td><td>O (수열비)</td></tr>
+    <tr><td>NG단가</td><td>O (ngCostNm3)</td><td>O (연료비/Gcal)</td><td>-</td><td>-</td><td>-</td><td>O (가스비)</td></tr>
+    <tr><td>CP/TLF</td><td>O (TLF, CP)</td><td>-</td><td>-</td><td>-</td><td>-</td><td>O (용량요금)</td></tr>
+    <tr><td>CHP 성능표</td><td>-</td><td>O (부하별 후보)</td><td>O (열출력)</td><td>-</td><td>O (발전MW)</td><td>-</td></tr>
+    <tr><td>PLB 성능표</td><td>-</td><td>O (PLB 단가)</td><td>-</td><td>O (대수/시간)</td><td>O (열투입)</td><td>-</td></tr>
+    <tr><td>축열조 설정</td><td>-</td><td>O (상태공간)</td><td>O (overflow체크)</td><td>O (하한체크)</td><td>O (상하한)</td><td>-</td></tr>
+    </tbody>
+    </table>
+    </div>
+</details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     4. 변경 가이드
+     ═══════════════════════════════════════════════════ -->
+<div class="section" id="change">
+<h2>4. 변경 가이드 &mdash; "이것을 바꾸려면 어디를?"</h2>
+
+<p>실무에서 가장 자주 발생하는 변경 시나리오별로, 수정할 위치와 영향 범위를 정리했습니다.</p>
+
+<table class="guide-table">
+<thead>
+<tr><th>변경 사항</th><th>수정 위치 (함수/영역)</th><th>영향 범위</th><th>주의사항</th></tr>
+</thead>
+<tbody>
+<tr>
+    <td><strong>새 수요 데이터 추가</strong><br>(예: 새 건물 연결)</td>
+    <td class="fn">buildDailyData (shDemandCols 배열)<br>TEMPLATES.sales_hourly (헤더)<br>index.html (업로드 UI)</td>
+    <td>전체 재계산 (수요 변경 &rarr; netRequired 변경 &rarr; DP 결과 변경)</td>
+    <td class="warn">sales_hourly의 헤더에 새 용도명 추가 필요. 기존 데이터 포맷과 호환되어야 함.</td>
+</tr>
+<tr>
+    <td><strong>CHP 기기 추가/변경</strong><br>(부하표 수정)</td>
+    <td class="fn">getChpLoadTable (설정 UI 읽기)<br>perfOptions (DP 탐색 후보)<br>index.html Step 2 (부하표 테이블)</td>
+    <td>DP 탐색 공간 변경 (부하 후보 수), 비용계산 전체</td>
+    <td class="warn">부하표는 부하율(%), 열출력(Gcal/h), 발전MW, NG소비(Nm3/h) 4컬럼. 최소부하~100% 범위.</td>
+</tr>
+<tr>
+    <td><strong>외부수열원 추가</strong></td>
+    <td class="fn">EXT_SOURCES 배열 (DEFAULT_EXT_SOURCES)<br>rebuildTemplateHeaders<br>설정 UI (addExtSource)</td>
+    <td>외부수열 합산, 수열비용 계산</td>
+    <td class="warn">type: 'supply'(수열만) 또는 'dual'(수열+판매). UI에서도 동적 추가 가능.</td>
+</tr>
+<tr>
+    <td><strong>축열조 용량 변경</strong></td>
+    <td class="fn">설정 UI (storageCapacity)<br>DP: numStates = (cap - min) / STEP</td>
+    <td>DP 상태 수 변경 &rarr; 메모리/속도 영향</td>
+    <td class="warn">STEP=10Gcal 기준. 용량 2000이면 상태 약 190개. 크게 늘리면 DP 느려질 수 있음.</td>
+</tr>
+<tr>
+    <td><strong>30년 확장</strong></td>
+    <td class="fn">solveMPC (N = days.length)<br>buildDailyData (년도 루프)<br>YEAR_DAYS, CURRENT_YEAR</td>
+    <td>계산시간 대폭 증가 (30배)</td>
+    <td class="warn">별도 섹션(5장) 참조. horizon 30일은 유지 가능하지만 데이터 생성이 관건.</td>
+</tr>
+<tr>
+    <td><strong>비용 항목 추가</strong><br>(예: 인건비, 감가상각)</td>
+    <td class="fn">비용산출 탭 (renderAllCosts)<br>운영손익 (renderContribution)<br>index.html (비용산출 서브탭)</td>
+    <td>비용 표시만 영향 (최적화 로직 무관)</td>
+    <td class="warn">최적화에 반영하려면 DP 비용함수 수정 필요 (고정비는 최적화에 영향 없음).</td>
+</tr>
+<tr>
+    <td><strong>전력수요 패턴 변경</strong></td>
+    <td class="fn">설정 Step 8 (monthlyDemandKW, hourlyDemandPattern)<br>collectSettings</td>
+    <td>계획수전 계산, 전력비</td>
+    <td class="warn">월별 평균kW x 24시간 패턴 x 보정계수 구조. 3가지 모두 맞춰야 함.</td>
+</tr>
+<tr>
+    <td><strong>정비일정 변경</strong></td>
+    <td class="fn">설정 Step 5 (mt1/mt2/mt3 시작/끝)<br>buildMaintenanceSet</td>
+    <td>정비일엔 CHP 강제 정지</td>
+    <td class="warn">최대 3개 기간 설정 가능. 겹치면 자동 합산.</td>
+</tr>
+<tr>
+    <td><strong>기동비용 조건 변경</strong><br>(Hot/Warm/Cold)</td>
+    <td class="fn">설정 Step 3 (hotTime, warmTime, coldTime, gasRate)<br>calcStartupCost 함수</td>
+    <td>DP에서 ON/OFF 결정 변경</td>
+    <td class="warn">정지레벨: 0=ON, 1=Hot(1일), 2=Warm(2일), 3=Cold(3일+). 기동비 = 시간 x 가스량 x NG단가.</td>
+</tr>
+<tr>
+    <td><strong>DP 탐색 정밀도 변경</strong></td>
+    <td class="fn">solveMPC 내부 STEP 변수 (현재 10Gcal)</td>
+    <td>상태 수 변경 &rarr; 속도/정확도 트레이드오프</td>
+    <td class="warn">STEP 줄이면 정밀하지만 느려짐. STEP=5면 상태 2배, 시간도 약 2배.</td>
+</tr>
+</tbody>
+</table>
+
+<div class="note note-warn">
+    CHP 성능표, 축열조 용량, DP 탐색 범위 등을 동시에 변경하면 영향이 복합적입니다.
+    한 번에 하나만 변경하고 결과를 검증하는 것을 권장합니다.
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     5. 30년 확장 로드맵
+     ═══════════════════════════════════════════════════ -->
+<div class="section" id="roadmap">
+<h2>5. 30년 확장 로드맵</h2>
+
+<h3>현재 상태</h3>
+<div class="card">
+    <p><strong>1년 (365일)</strong> 시뮬레이션. MPC horizon = 30일. DP 계산 약 3~10초.</p>
+    <p>데이터: 실적 기반 (엑셀 업로드). 모든 입력이 1년 단위.</p>
+</div>
+
+<h3>30년으로 늘리면 무엇이 달라지는가</h3>
+
+<table class="guide-table">
+<thead><tr><th>항목</th><th>현재 (1년)</th><th>30년</th><th>비고</th></tr></thead>
+<tbody>
+<tr><td>일수</td><td>365일</td><td>10,950일</td><td>30배 증가</td></tr>
+<tr><td>MPC horizon</td><td>30일</td><td>30일 (유지 가능)</td><td>MPC 특성상 horizon은 고정해도 됨</td></tr>
+<tr><td>MPC 루프 횟수</td><td>365회</td><td>10,950회</td><td>단순 30배, 각 루프의 DP는 동일 크기</td></tr>
+<tr><td>예상 소요시간</td><td>3~10초</td><td>90~300초 (1.5~5분)</td><td>Web Worker 분리 시 UI 블로킹 없음</td></tr>
+<tr><td>데이터 크기</td><td>시간별: 8,760행</td><td>시간별: 262,800행</td><td>엑셀 단일 시트 한계 주의</td></tr>
+</tbody>
+</table>
+
+<h3>핵심 과제: 30년치 데이터 확보</h3>
+<p>실적 데이터는 과거 1~2년뿐입니다. 30년 시뮬레이션을 위해서는 미래 데이터를 <strong>추정</strong>해야 합니다.</p>
+
+<div class="card">
+    <div class="card-title" style="color:#93c5fd;">추정 방법</div>
+    <ul>
+        <li><strong>수요:</strong> 기준년도 패턴 반복 + 연도별 성장률 적용 (설정의 demandGrowthPct 활용)</li>
+        <li><strong>SMP:</strong> 기준년도 패턴 + 연도별 물가상승 반영, 또는 시나리오별 가정</li>
+        <li><strong>NG단가:</strong> 기준년도 + 연도별 상승률 (에너지원 가격 시나리오)</li>
+        <li><strong>외부수열:</strong> 기준년도 패턴 반복 + 신규 수열원 반영 시점 설정</li>
+        <li><strong>기기 성능:</strong> 경년 열화 모델 적용 (효율 감소, 정비 주기 변경)</li>
+    </ul>
+</div>
+
+<h3>단계별 확장 방안</h3>
+<div class="timeline">
+    <div class="tl-item" style="--c:#8b5cf6;">
+        <div style="position:absolute;left:-24px;top:6px;width:10px;height:10px;border-radius:50%;border:2px solid #8b5cf6;background:var(--bg);"></div>
+        <div class="tl-title" style="color:#c4b5fd;">1단계: 데이터 생성기 구현</div>
+        <div class="tl-desc">
+            기준년도 실적을 복제하여 N년치 데이터를 자동 생성하는 함수 구현.
+            연도별 성장률/물가상승 파라미터를 설정 UI에 추가.
+            <code>buildDailyData</code>의 연도 루프를 다년도로 확장.
+        </div>
+    </div>
+    <div class="tl-item">
+        <div style="position:absolute;left:-24px;top:6px;width:10px;height:10px;border-radius:50%;border:2px solid #3b82f6;background:var(--bg);"></div>
+        <div class="tl-title" style="color:#93c5fd;">2단계: 성능 최적화</div>
+        <div class="tl-desc">
+            MPC 루프를 Web Worker로 분리하여 UI 블로킹 방지.
+            DP 내부 Float64Array 최적화는 이미 되어 있으므로, 루프 자체의 오버헤드만 관리.
+            진행률 표시를 10,950일 기준으로 조정.
+        </div>
+    </div>
+    <div class="tl-item">
+        <div style="position:absolute;left:-24px;top:6px;width:10px;height:10px;border-radius:50%;border:2px solid #22c55e;background:var(--bg);"></div>
+        <div class="tl-title" style="color:#86efac;">3단계: 결과 집계/시각화 확장</div>
+        <div class="tl-desc">
+            월별 요약을 연별 요약으로 확장 (<code>aggregateMonthly</code> &rarr; <code>aggregateYearly</code>).
+            30년 추세 차트(연간 비용, 공헌이익 추이) 추가.
+            NPV(순현재가치), IRR(내부수익률) 등 투자분석 지표 산출.
+        </div>
+    </div>
+    <div class="tl-item">
+        <div style="position:absolute;left:-24px;top:6px;width:10px;height:10px;border-radius:50%;border:2px solid #f59e0b;background:var(--bg);"></div>
+        <div class="tl-title" style="color:#fcd34d;">4단계: 시나리오 비교</div>
+        <div class="tl-desc">
+            복수 시나리오(낙관/기본/비관)를 설정하여 30년 결과를 비교하는 기능.
+            기기 교체 시점, 수열원 변경 등의 이벤트를 타임라인에 설정.
+        </div>
+    </div>
+</div>
+
+<div class="note note-info">
+    <strong>MPC의 장점:</strong> horizon 30일을 유지하면 DP 상태공간은 변하지 않습니다.
+    30년이라도 매일 30일짜리 소형 DP를 10,950번 풀 뿐이므로, 전체 365일 DP보다 오히려 확장에 유리합니다.
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     6. 용어 사전
+     ═══════════════════════════════════════════════════ -->
+<div class="section" id="glossary">
+<h2>6. 용어 사전</h2>
+
+<div class="term-grid">
+    <div class="term-item">
+        <dt>MPC (Model Predictive Control)</dt>
+        <dd>모델예측제어. 매 시점 미래 N일을 예측하여 최적 결정을 내리되, 한 단계만 실행하고 다음 시점에 다시 예측하는 제어 방식.</dd>
+    </div>
+    <div class="term-item">
+        <dt>DP (Dynamic Programming)</dt>
+        <dd>동적 계획법. 큰 문제를 작은 부분 문제로 나누어 최적해를 구하는 알고리즘. 여기서는 역방향으로 각 상태의 최소비용을 계산.</dd>
+    </div>
+    <div class="term-item">
+        <dt>SMP (System Marginal Price)</dt>
+        <dd>계통한계가격. 전력시장에서 시간별로 결정되는 전기 도매가격. CHP의 전기 판매 수익 기준.</dd>
+    </div>
+    <div class="term-item">
+        <dt>MP (Market Price / 정산가격)</dt>
+        <dd>실제 정산에 사용되는 가격. SMP x TLF(손실보전계수) + 무부하비정산으로 산출.</dd>
+    </div>
+    <div class="term-item">
+        <dt>TLF (Transmission Loss Factor)</dt>
+        <dd>송전손실보전계수. 발전소에서 소비지까지 전력 손실을 보상하는 계수. 평일/토요일/공휴일별로 다름.</dd>
+    </div>
+    <div class="term-item">
+        <dt>CP (Capacity Payment / 용량요금)</dt>
+        <dd>발전 용량 확보에 대한 고정 보상금. CHP가 가동하지 않아도 평일/휴일별로 받는 수입.</dd>
+    </div>
+    <div class="term-item">
+        <dt>CHP (Combined Heat and Power)</dt>
+        <dd>열병합발전. 가스를 태워 열과 전기를 동시에 생산. 전기는 판매하고 열은 지역난방에 공급.</dd>
+    </div>
+    <div class="term-item">
+        <dt>PLB (Peak Load Boiler)</dt>
+        <dd>첨두부하보일러. 열수요가 CHP만으로 부족할 때 보조적으로 가동. 전기는 생산하지 않음.</dd>
+    </div>
+    <div class="term-item">
+        <dt>축열조 (Thermal Storage)</dt>
+        <dd>열을 온수 형태로 저장하는 탱크. 생산과 소비의 시간차를 완충. 최소잔량(storageMin)과 최대용량(storageCap)의 제약이 있음.</dd>
+    </div>
+    <div class="term-item">
+        <dt>Horizon (탐색 범위)</dt>
+        <dd>MPC에서 미래를 내다보는 일수. 현재 30일. 이 범위 내에서 DP로 최적 경로를 탐색.</dd>
+    </div>
+    <div class="term-item">
+        <dt>netRequired (순필요열량)</dt>
+        <dd>수요 - 외부수열(손실 차감) - 인테코 순수열. CHP/PLB/축열조가 충당해야 할 열량.</dd>
+    </div>
+    <div class="term-item">
+        <dt>stopLevel (정지레벨)</dt>
+        <dd>CHP 정지 경과 상태. 0=가동중, 1=Hot(1일 정지), 2=Warm(2일), 3=Cold(3일+). 재기동 시 기동비용에 영향.</dd>
+    </div>
+    <div class="term-item">
+        <dt>Bellman Equation</dt>
+        <dd>DP의 핵심 점화식. "현재 비용 + 미래 최적 비용 = 현재부터 끝까지 최적 비용". 역방향으로 채워감.</dd>
+    </div>
+    <div class="term-item">
+        <dt>Overflow / Underflow</dt>
+        <dd>축열조가 상한(cap) 또는 하한(min)을 벗어나는 상황. overflow 시 열을 버려야 하고, underflow 시 열 공급 부족.</dd>
+    </div>
+</div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+</body>
+</html>

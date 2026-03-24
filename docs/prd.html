@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>위드시뮬 PRD — 제품 요구사항 정의서</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0f1e;--card:#1a1a35;--card2:#1e1e3a;--border:#2a2a4a;--text:#e0e0e0;--dim:#9090aa;--muted:#6060aa;--accent:#8b5cf6;--blue:#3b82f6;--green:#22c55e;--cyan:#06b6d4;--amber:#f59e0b;--red:#ef4444;--pink:#ec4899}
+html{scroll-behavior:smooth}
+body{font-family:'Pretendard',-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;font-size:14px}
+
+/* 레이아웃 */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--border);background:#12122a;padding:20px 0;z-index:100}
+.main{flex:1;max-width:960px;margin:0 auto;padding:40px 48px 80px}
+
+/* 사이드바 */
+.sb-title{font-size:12px;font-weight:700;color:var(--accent);padding:0 16px;margin-bottom:12px;letter-spacing:.05em;text-transform:uppercase}
+.sb-list{list-style:none}
+.sb-list a{display:block;padding:6px 16px;font-size:12px;color:var(--dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s}
+.sb-list a:hover{color:var(--text);background:rgba(139,92,246,.06);border-left-color:var(--accent)}
+.sb-list a.sub{padding-left:28px;font-size:11px;color:var(--muted)}
+.sb-sep{height:1px;background:var(--border);margin:8px 16px}
+
+/* 헤더 */
+.header{padding:48px 0 28px;border-bottom:1px solid var(--border);margin-bottom:40px}
+.header h1{font-size:28px;font-weight:900;color:#f0f0ff;letter-spacing:-.03em;margin-bottom:6px}
+.header p{color:var(--dim);font-size:13px}
+.header .meta{display:flex;gap:12px;margin-top:14px;font-size:11px;color:var(--muted)}
+.header .meta span{background:rgba(51,65,85,.4);padding:3px 10px;border-radius:5px}
+
+/* 섹션 */
+.section{margin-bottom:48px}
+.section h2{font-size:20px;font-weight:800;color:#f0f0ff;margin-bottom:6px;padding-bottom:10px;border-bottom:2px solid var(--accent);display:inline-block;letter-spacing:-.02em}
+.section h3{font-size:16px;font-weight:700;color:#c0c0e0;margin:24px 0 10px}
+.section h4{font-size:14px;font-weight:700;color:#a0a0c0;margin:18px 0 8px}
+.section p,.section li{color:var(--dim);font-size:13px;line-height:1.85}
+.section ul,.section ol{padding-left:18px;margin:6px 0}
+
+/* 카드 */
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin:14px 0}
+.card-title{font-size:14px;font-weight:700;margin-bottom:6px}
+
+/* 테이블 */
+.t{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}
+.t th{background:rgba(139,92,246,.1);color:#c4b5fd;font-weight:700;text-align:left;padding:8px 12px;border-bottom:2px solid var(--accent);white-space:nowrap}
+.t td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--dim);vertical-align:top}
+.t tr:hover td{background:rgba(139,92,246,.03)}
+.fn{font-family:'Consolas','SF Mono',monospace;font-size:11px;color:#93c5fd}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin:1px 2px}
+.tag-r{background:rgba(239,68,68,.12);color:#fca5a5}
+.tag-g{background:rgba(34,197,94,.12);color:#86efac}
+.tag-b{background:rgba(59,130,246,.12);color:#93c5fd}
+.tag-a{background:rgba(245,158,11,.12);color:#fcd34d}
+.tag-p{background:rgba(139,92,246,.12);color:#c4b5fd}
+
+/* 파이프라인 */
+.pipe{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:20px 0;padding:20px;background:rgba(30,30,58,.6);border:1px solid var(--border);border-radius:14px}
+.pipe-box{flex:0 0 auto;text-align:center;padding:12px 16px;border-radius:8px;border:1.5px solid;min-width:90px}
+.pipe-box .n{font-size:18px;font-weight:900;margin-bottom:2px}
+.pipe-box .l{font-size:11px;font-weight:600}
+.pipe-box .d{font-size:9px;margin-top:3px;opacity:.7}
+.pipe-arr{flex:0 0 auto;color:var(--muted);font-size:18px;padding:0 5px}
+
+/* 주석 */
+.note{padding:12px 16px;border-radius:8px;font-size:12px;line-height:1.75;margin:12px 0}
+.note-i{background:rgba(59,130,246,.08);border-left:3px solid var(--blue);color:#93c5fd}
+.note-w{background:rgba(245,158,11,.08);border-left:3px solid var(--amber);color:#fcd34d}
+.note-t{background:rgba(139,92,246,.08);border-left:3px solid var(--accent);color:#c4b5fd}
+
+/* 코드 블록 */
+.code{background:#12122a;border:1px solid var(--border);border-radius:8px;padding:14px 18px;font-family:'Consolas',monospace;font-size:12px;color:#93c5fd;line-height:1.7;margin:12px 0;overflow-x:auto;white-space:pre}
+
+/* 반응형 */
+@media(max-width:900px){.sidebar{display:none}.main{padding:20px 16px 60px}}
+@media print{body{background:#fff;color:#1e293b;font-size:11px}.sidebar{display:none}.main{max-width:100%;padding:16px}.card{background:#f8fafc;border-color:#e2e8f0;break-inside:avoid}.t th{background:#f1f5f9;color:#334155}.t td{color:#475569}h2{border-bottom-color:#6d28d9!important}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- 사이드바 -->
+<nav class="sidebar">
+<div class="sb-title">PRD 목차</div>
+<ul class="sb-list">
+<li><a href="#overview">1. 제품 개요</a></li>
+<li><a href="#pipeline" class="sub">파이프라인 6단계</a></li>
+<li><a href="#arch" class="sub">기술 스택</a></li>
+<div class="sb-sep"></div>
+<li><a href="#tab1">2. 데이터 입력</a></li>
+<li><a href="#tab1-input" class="sub">입력 데이터 6종</a></li>
+<li><a href="#tab1-price" class="sub">단가/요금 8종</a></li>
+<div class="sb-sep"></div>
+<li><a href="#tab2">3. 설정 (8단계)</a></li>
+<div class="sb-sep"></div>
+<li><a href="#tab3">4. 데이터 산출</a></li>
+<div class="sb-sep"></div>
+<li><a href="#tab4">5. 기동계획 (MPC)</a></li>
+<li><a href="#tab4-algo" class="sub">최적화 알고리즘</a></li>
+<li><a href="#tab4-output" class="sub">출력 결과</a></li>
+<div class="sb-sep"></div>
+<li><a href="#tab5">6. 비용산출</a></li>
+<div class="sb-sep"></div>
+<li><a href="#tab6">7. 운영손익</a></li>
+<div class="sb-sep"></div>
+<li><a href="#cost-formula">8. 비용 계산 체계</a></li>
+<div class="sb-sep"></div>
+<li><a href="#params">9. 설정 파라미터</a></li>
+<li><a href="#usecase">10. 사용자 시나리오</a></li>
+<li><a href="#roadmap">11. 향후 계획</a></li>
+<li><a href="#glossary">12. 용어 사전</a></li>
+</ul>
+</nav>
+
+<!-- 메인 -->
+<div class="main">
+
+<div class="header">
+<h1>위드시뮬 PRD</h1>
+<p>CHP 보일러 기동계획 시뮬레이터 — 제품 요구사항 정의서</p>
+<div class="meta">
+<span>v5.3 MPC 정밀최적화</span>
+<span>2026-03-20</span>
+<span>위드인천에너지</span>
+</div>
+</div>
+
+<!-- 1. 제품 개요 -->
+<div class="section" id="overview">
+<h2>1. 제품 개요</h2>
+<p>위드인천에너지의 <strong>열병합발전(CHP)</strong> 및 <strong>보조보일러(PLB)</strong> 최적 운전 계획을 수립하는 시뮬레이션 도구입니다. 365일 시뮬레이션을 통해 연간 연료비를 최소화하는 기동계획을 자동으로 생성하고, 전력비/가스비/수열비 등 운영비용과 공헌이익을 분석합니다.</p>
+
+<h3 id="pipeline">파이프라인 6단계</h3>
+<p>앱은 6단계 파이프라인으로 구성됩니다. 이전 단계가 완료되어야 다음 단계가 활성화됩니다.</p>
+<div class="pipe">
+<div class="pipe-box" style="border-color:#8b5cf6;color:#c4b5fd"><div class="n">1</div><div class="l">데이터</div><div class="d">Excel 업로드</div></div>
+<div class="pipe-arr">&rarr;</div>
+<div class="pipe-box" style="border-color:#3b82f6;color:#93c5fd"><div class="n">2</div><div class="l">설정</div><div class="d">기기/축열조/정비</div></div>
+<div class="pipe-arr">&rarr;</div>
+<div class="pipe-box" style="border-color:#06b6d4;color:#67e8f9"><div class="n">3</div><div class="l">데이터 산출</div><div class="d">MP/용량요금</div></div>
+<div class="pipe-arr">&rarr;</div>
+<div class="pipe-box" style="border-color:#22c55e;color:#86efac"><div class="n">4</div><div class="l">기동계획</div><div class="d">MPC 최적화</div></div>
+<div class="pipe-arr">&rarr;</div>
+<div class="pipe-box" style="border-color:#f59e0b;color:#fcd34d"><div class="n">5</div><div class="l">비용산출</div><div class="d">전력비/가스비</div></div>
+<div class="pipe-arr">&rarr;</div>
+<div class="pipe-box" style="border-color:#ef4444;color:#fca5a5"><div class="n">6</div><div class="l">운영손익</div><div class="d">공헌이익</div></div>
+</div>
+
+<h3 id="arch">기술 스택</h3>
+<table class="t">
+<thead><tr><th>구분</th><th>기술</th><th>역할</th></tr></thead>
+<tbody>
+<tr><td>Frontend</td><td>HTML/CSS/JS (바닐라)</td><td>UI, 최적화 엔진, 차트 렌더링</td></tr>
+<tr><td>Backend</td><td>Python pywebview</td><td>파일 I/O, Excel 읽기/쓰기, 데스크톱 앱</td></tr>
+<tr><td>차트</td><td>Chart.js 4.4.7</td><td>월별/일별/시간별 차트</td></tr>
+<tr><td>폰트</td><td>Pretendard + Inter</td><td>한글/영문 UI</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 2. 데이터 입력 -->
+<div class="section" id="tab1">
+<h2>2. 데이터 입력</h2>
+<p>Excel 일괄 업로드 또는 개별 CSV 업로드로 데이터를 입력합니다.</p>
+
+<h3 id="tab1-input">입력 데이터 (6종)</h3>
+<table class="t">
+<thead><tr><th>데이터</th><th>형식</th><th>주기</th><th>용도</th><th>필수</th></tr></thead>
+<tbody>
+<tr><td><strong>SMP</strong></td><td>월,일,1h~24h</td><td>시간별</td><td>전력 시장가격 → MP 변환</td><td><span class="tag tag-r">필수</span></td></tr>
+<tr><td><strong>판매실적</strong></td><td>월,일,시,주택/업무/공공</td><td>시간별</td><td>열수요 패턴, 열판매매출</td><td><span class="tag tag-r">필수</span></td></tr>
+<tr><td><strong>외부거래</strong></td><td>월,일,보유열량,CHP,PLB,수열원...</td><td>일별</td><td>외부수열 합산, 수열비용</td><td><span class="tag tag-r">필수</span></td></tr>
+<tr><td><strong>공휴일</strong></td><td>월,일,요일명,공휴일여부</td><td>일별</td><td>TLF 구분, 요일 판단</td><td><span class="tag tag-b">선택</span></td></tr>
+<tr><td><strong>전력수급</strong></td><td>월,일,1h~24h (kWh)</td><td>시간별</td><td>전력수요 역산</td><td><span class="tag tag-b">선택</span></td></tr>
+<tr><td><strong>용수약품</strong></td><td>월,일,수도사용,약품사용</td><td>일별</td><td>용수약품비 계산</td><td><span class="tag tag-b">선택</span></td></tr>
+</tbody>
+</table>
+
+<h3 id="tab1-price">단가/요금 데이터 (8종)</h3>
+<table class="t">
+<thead><tr><th>데이터</th><th>주기</th><th>용도</th></tr></thead>
+<tbody>
+<tr><td><strong>CP/TLF</strong></td><td>월별</td><td>MP산출 (SMP&times;TLF), 용량요금</td></tr>
+<tr><td><strong>NG단가</strong></td><td>월별</td><td>CHP/PLB 연료비 (원/MJ → 원/Nm3)</td></tr>
+<tr><td><strong>전기요금표</strong></td><td>시간대별 &times; 3</td><td>수전비 (평일/토요일/공휴일)</td></tr>
+<tr><td><strong>열요금표</strong></td><td>항목별</td><td>열판매매출 (기본료+사용료)</td></tr>
+<tr><td><strong>수도단가</strong></td><td>월별</td><td>용수비</td></tr>
+<tr><td><strong>약품단가</strong></td><td>월별</td><td>약품비</td></tr>
+<tr><td><strong>판매단가</strong></td><td>열원별</td><td>외부열 수열비</td></tr>
+<tr><td><strong>기본료설정</strong></td><td>월별</td><td>전력 기본료</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 3. 설정 -->
+<div class="section" id="tab2">
+<h2>3. 설정 (8단계)</h2>
+
+<div class="card"><div class="card-title" style="color:#c4b5fd">Step 1: CHP 사양</div>
+<p>부하별 성능표 — 부하율(20~100%), 발전MW, 송전MW, 열출력(Gcal/h), NG소비(Nm3/h), 종합효율(%)</p></div>
+
+<div class="card"><div class="card-title" style="color:#93c5fd">Step 2: PLB 사양</div>
+<p>보유대수(기본 3대), 소내전력비, 부하별 성능표</p></div>
+
+<div class="card"><div class="card-title" style="color:#67e8f9">Step 3: 축열조</div>
+<p>총용량(1500Gcal), 초기잔량(750), 최소잔량(100), 최대 충/방열 속도</p></div>
+
+<div class="card"><div class="card-title" style="color:#86efac">Step 4: 기동/정지 조건</div>
+<p>Hot/Warm/Cold Start: 소요시간 &times; 가스사용량. CHP 최소운전/정지시간(4h), 최소부하(60%). PLB 최소운전시간(2h)</p></div>
+
+<div class="card"><div class="card-title" style="color:#fcd34d">Step 5: 정비일정</div>
+<p>최대 3건: 시작일~종료일. 정비일에는 CHP 강제 정지</p></div>
+
+<div class="card"><div class="card-title" style="color:#fca5a5">Step 6: 전력정산 계수</div>
+<p>MP = SMP &times; TLF + 무부하비정산. 1차/2차 증분계수, 상수로 NLPC 계산</p></div>
+
+<div class="card"><div class="card-title" style="color:#f9a8d4">Step 7: 외부수열원 관리</div>
+<p>EXT_SOURCES 레지스트리: 수열원 추가/삭제/활성화 토글</p></div>
+
+<div class="card"><div class="card-title" style="color:#a78bfa">Step 8: 전력수요 모델링</div>
+<p>월별 평균kW &times; 24시간 패턴 &times; 보정계수. 실적에서 자동 추출 기능</p></div>
+</div>
+
+<!-- 4. 데이터 산출 -->
+<div class="section" id="tab3">
+<h2>4. 데이터 산출</h2>
+<p>"전체 산출" 버튼으로 5가지 중간 계산을 자동 실행합니다.</p>
+<table class="t">
+<thead><tr><th>산출 항목</th><th>계산 내용</th><th>핵심 함수</th></tr></thead>
+<tbody>
+<tr><td><strong>MP (정산가격)</strong></td><td>SMP &times; TLF + 무부하비정산 (시간별)</td><td class="fn">calculateMP()</td></tr>
+<tr><td><strong>용량요금</strong></td><td>일별 평일/휴일 CP 누적 (월별 합계)</td><td class="fn">calculateCapacityCharge()</td></tr>
+<tr><td><strong>외부수열비</strong></td><td>외부열원별 공급량 &times; 판매단가</td><td class="fn">calculateExternalHeatCost()</td></tr>
+<tr><td><strong>열판매매출</strong></td><td>항목별 기본료 + 사용료</td><td class="fn">calculateHeatSalesRevenue()</td></tr>
+<tr><td><strong>용수약품비</strong></td><td>용수사용 &times; 단가 + 약품사용 &times; 단가</td><td class="fn">calculateWaterChem()</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 5. 기동계획 -->
+<div class="section" id="tab4">
+<h2>5. 기동계획 (MPC 최적화)</h2>
+<p>365일 최적 CHP/PLB 운전 계획을 자동 생성하는 핵심 기능입니다.</p>
+
+<h3 id="tab4-algo">최적화 알고리즘: MPC + DP</h3>
+<div class="note note-t"><strong>MPC (Model Predictive Control)</strong>: 매일 30일 앞을 내다보고 오늘 결정만 확정. 내일은 실제 축열조 잔량으로 다시 계산. 365일 반복.</div>
+
+<div class="code">매일 반복 (1일~365일):
+  ┌─ 제약조건 확정 ──────────────────────────┐
+  │  1순위: 정비일 → 가동 불가              │
+  │  2순위: minStopTime → 시작시간 제한      │
+  │  3순위: overflow → 사전검증 (DP 내부)    │
+  └──────────────────────────────────────────┘
+       ↓
+  Block 1: 역방향 DP (30일 윈도우)
+       → 제약 범위 내 최소비용 경로 탐색
+       ↓
+  Block 2: 결정 추출
+       → 오늘의 최적 CHP 시간/부하
+       ↓
+  Block 3: 블록 배치 (Stage 2)
+       → MP 높은 시간대에 CHP 배치
+       ↓
+  Block 4: PLB 판단 (Stage 3)
+       → 축열조 부족 시 보조보일러 투입
+       ↓
+  Block 5: 시간별 시뮬 (Stage 4)
+       → 24시간 에너지 밸런스 검증
+       ↓
+  Block 6: 집계
+       → 비용/수익 산출, 다음날로 상태 전달</div>
+
+<h4>DP 상태공간</h4>
+<table class="t">
+<thead><tr><th>차원</th><th>범위</th><th>단위</th><th>예시</th></tr></thead>
+<tbody>
+<tr><td>축열조 잔량</td><td>storageMin ~ storageCap</td><td>10 Gcal 단위</td><td>100~1500 → 141개</td></tr>
+<tr><td>정지레벨</td><td>0(가동), 1(Hot), 2(Warm), 3(Cold)</td><td>4단계</td><td>4개</td></tr>
+<tr><td>합계</td><td colspan="3">141 &times; 4 = <strong>564개 상태</strong>, 매일 30일 윈도우에서 탐색</td></tr>
+</tbody>
+</table>
+
+<h3 id="tab4-output">출력 결과</h3>
+<table class="t">
+<thead><tr><th>뷰</th><th>내용</th></tr></thead>
+<tbody>
+<tr><td><strong>월별 요약</strong></td><td>CHP/PLB 가동시간, 열량, 연료비, 전력수익, 축열조 추이</td></tr>
+<tr><td><strong>월별 차트</strong></td><td>열출력 누적 막대, 축열조 꺾은선, 재료비 구성, 총비용 추이</td></tr>
+<tr><td><strong>일별 테이블</strong></td><td>365일 상세 (행 클릭 → 24시간 모달)</td></tr>
+<tr><td><strong>일별 모달</strong></td><td>시간별 수요/CHP/PLB/축열조 차트, 축방열/SMP 배지</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 6. 비용산출 -->
+<div class="section" id="tab5">
+<h2>6. 비용산출</h2>
+<table class="t">
+<thead><tr><th>항목</th><th>내용</th><th>핵심 함수</th></tr></thead>
+<tbody>
+<tr><td><strong>전력수요</strong></td><td>월별 전력수요 합계 + 24시간 패턴 차트</td><td class="fn">buildElecDemandProfile()</td></tr>
+<tr><td><strong>전력비</strong></td><td>실적 vs 계획 수전비 비교, 시간대별 요금 적용</td><td class="fn">calcElecCostMonthly()</td></tr>
+<tr><td><strong>가스비</strong></td><td>CHP + PLB + 기동 연료비 (월별)</td><td class="fn">renderCostGas()</td></tr>
+<tr><td><strong>용수약품비</strong></td><td>용수비 + 약품비 (월별)</td><td class="fn">renderCostWaterChem()</td></tr>
+<tr><td><strong>수열비</strong></td><td>외부열 구매비용 (열원별/월별)</td><td class="fn">renderCostExtHeat()</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 7. 운영손익 -->
+<div class="section" id="tab6">
+<h2>7. 운영손익</h2>
+<p>최종 손익을 4개 카드 + 월별 차트로 시각화합니다.</p>
+<div class="card">
+<div class="card-title" style="color:#86efac">연간 손익 구조</div>
+<div class="code" style="color:#86efac">매출 = 전력판매(CHP발전&times;MP + 용량요금) + 열판매매출
+재료비 = 가스비 + 전력비(수전) + 수열비 + 용수약품비
+공헌이익 = 매출 - 재료비
+공헌이익률 = 공헌이익 / 매출 &times; 100</div>
+</div>
+<p>차트: 월별 공헌이익 추이, 이익률 추이, 매출 구성 도넛, 재료비 구성 도넛</p>
+</div>
+
+<!-- 8. 비용 계산 체계 -->
+<div class="section" id="cost-formula">
+<h2>8. 비용 계산 체계</h2>
+<div class="code" style="color:#fcd34d">전력판매 = CHP발전(MWh) &times; MP(원/kWh) + CP용량요금(원)
+  MP = SMP &times; TLF(월별) + 무부하비정산(원/kWh)
+
+열판매 = &Sigma;(항목별 기본료 + 판매량 &times; 열요금)
+
+연료비 = CHP연료 + PLB연료 + 기동비용
+  CHP연료 = 가동시간 &times; NG소비(Nm3/h) &times; NG단가(원/Nm3)
+  기동비용 = 기동시간 &times; 가스사용량 &times; NG단가
+
+CHP단가 = (연료비 + 기동비 - 전력판매) / 생산열량(Gcal)
+
+수전비 = &Sigma;h max(0, 수요h - CHP발전h) &times; 시간대별전기요금
+
+수열비 = &Sigma;(외부열공급량 &times; 판매단가)
+
+용수약품비 = 용수사용 &times; 수도단가 + 약품사용 &times; 약품단가</div>
+</div>
+
+<!-- 9. 설정 파라미터 -->
+<div class="section" id="params">
+<h2>9. 주요 설정 파라미터</h2>
+<table class="t">
+<thead><tr><th>파라미터</th><th>기본값</th><th>범위</th><th>영향</th></tr></thead>
+<tbody>
+<tr><td>CHP 최소부하</td><td>60%</td><td>20~100%</td><td>DP 탐색 후보 수</td></tr>
+<tr><td>CHP 최소운전시간</td><td>4h</td><td>1~24h</td><td>기동 횟수 제한</td></tr>
+<tr><td>CHP 최소정지시간</td><td>4h</td><td>1~24h</td><td>재기동 간격</td></tr>
+<tr><td>PLB 보유대수</td><td>3대</td><td>1~5대</td><td>열부족 보충 능력</td></tr>
+<tr><td>PLB 최소운전시간</td><td>2h</td><td>1~6h</td><td>PLB 효율</td></tr>
+<tr><td>축열조 용량</td><td>1500 Gcal</td><td>100~5000</td><td>DP 상태 수</td></tr>
+<tr><td>축열조 초기잔량</td><td>750 Gcal</td><td>0~용량</td><td>시뮬 시작값</td></tr>
+<tr><td>축열조 최소잔량</td><td>100 Gcal</td><td>0~500</td><td>PLB 투입 기준</td></tr>
+<tr><td>MPC Horizon</td><td>30일</td><td>7~365</td><td>DP 윈도우 크기</td></tr>
+<tr><td>DP STEP</td><td>10 Gcal</td><td>5~50</td><td>정밀도/속도 트레이드오프</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 10. 사용자 시나리오 -->
+<div class="section" id="usecase">
+<h2>10. 사용자 시나리오</h2>
+
+<h3>신규 프로젝트 생성 → 최적화 실행</h3>
+<div class="code" style="color:#86efac">1. 홈 → "새 프로젝트" → "24위드" 입력 → 생성
+2. 탭1 (데이터) → Excel 일괄 업로드
+3. 탭2 (설정) → Step 1~8 입력 → "값 적용"
+4. 탭3 (데이터 산출) → "전체 산출" 클릭
+5. 탭4 (기동계획) → "최적화 실행" → 365일 MPC
+6. 탭5 (비용산출) → 자동 표시
+7. 탭6 (운영손익) → 공헌이익 확인</div>
+
+<h3>시나리오 비교</h3>
+<div class="code" style="color:#fcd34d">1. 설정 변경 (예: CHP 최소부하 60% → 70%)
+2. "값 적용" → 탭4 → "최적화 실행" 재실행
+3. 결과 비교 분석</div>
+</div>
+
+<!-- 11. 향후 계획 -->
+<div class="section" id="roadmap">
+<h2>11. 향후 계획</h2>
+<table class="t">
+<thead><tr><th>항목</th><th>현재</th><th>목표</th></tr></thead>
+<tbody>
+<tr><td>시뮬 기간</td><td>1년 (365일)</td><td>30년 (10,950일)</td></tr>
+<tr><td>데이터 생성</td><td>실적 기반</td><td>추정 (연도별 성장률/물가상승)</td></tr>
+<tr><td>결과 집계</td><td>월별</td><td>연별 + NPV/IRR</td></tr>
+<tr><td>시나리오</td><td>단일</td><td>복수 (낙관/기본/비관)</td></tr>
+<tr><td>전력비</td><td>수전비 합계</td><td>기본료/수전요금/기후환경/연료비/전력기금 분리</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 12. 용어 사전 -->
+<div class="section" id="glossary">
+<h2>12. 용어 사전</h2>
+<table class="t">
+<thead><tr><th>용어</th><th>약자</th><th>설명</th></tr></thead>
+<tbody>
+<tr><td>열병합발전</td><td>CHP</td><td>가스로 전기+열 동시 생산. 전기는 판매, 열은 지역난방 공급</td></tr>
+<tr><td>보조보일러</td><td>PLB</td><td>CHP만으로 부족한 열을 추가 생산. 전기 미생산</td></tr>
+<tr><td>축열조</td><td>TES</td><td>열을 온수로 저장. 생산/소비 시간차 완충</td></tr>
+<tr><td>계통한계가격</td><td>SMP</td><td>전력시장 시간별 도매가격 (원/kWh)</td></tr>
+<tr><td>정산가격</td><td>MP</td><td>SMP &times; TLF + 무부하비정산. 실제 정산 기준</td></tr>
+<tr><td>송전손실보전계수</td><td>TLF</td><td>송전 손실 보상 계수. 평일/토/공휴일별 다름</td></tr>
+<tr><td>용량요금</td><td>CP</td><td>발전 용량 확보에 대한 고정 보상금</td></tr>
+<tr><td>모델예측제어</td><td>MPC</td><td>미래 N일 예측 후 오늘만 실행, 내일 다시 계산</td></tr>
+<tr><td>동적계획법</td><td>DP</td><td>큰 문제를 작은 부분문제로 나누어 최적해 도출</td></tr>
+<tr><td>순필요열량</td><td>netRequired</td><td>수요 - 외부수열. CHP/PLB/축열조가 충당할 열량</td></tr>
+<tr><td>정지레벨</td><td>stopLevel</td><td>0=가동, 1=Hot(1일), 2=Warm(2일), 3=Cold(3일+)</td></tr>
+<tr><td>공헌이익</td><td>-</td><td>매출 - 재료비 (고정비 제외)</td></tr>
+</tbody>
+</table>
+</div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+</body>
+</html>

@@ -290,16 +290,38 @@
             </div>
         </div>
         <div class="setting-group">
+            <h4 class="setting-group-title">월별 축열 상한 (Gcal)</h4>
+            <table class="settings-tbl" id="storageMonthlyCapTable" style="font-size:12px">
+                <thead><tr><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th></tr></thead>
+                <tbody><tr>
+                    <td><input type="text" id="stCap1" value="850" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap2" value="850" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap3" value="750" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap4" value="600" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap5" value="400" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap6" value="300" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap7" value="300" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap8" value="300" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap9" value="400" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap10" value="600" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap11" value="750" style="width:45px;text-align:center"></td>
+                    <td><input type="text" id="stCap12" value="850" style="width:45px;text-align:center"></td>
+                </tr></tbody>
+            </table>
+        </div>
+        <div class="setting-group">
             <h4 class="setting-group-title">충방열 속도</h4>
             <div class="setting-grid">
-                <label>최대 충열속도 (Gcal/h) <input type="text" id="storageChargeRate" value="150"></label>
+                <label>최대 축열속도 (Gcal/h) <input type="text" id="storageChargeRate" value="50"></label>
                 <label>최대 방열속도 (Gcal/h) <input type="text" id="storageDischargeRate" value="150"></label>
             </div>
         </div>
         <div class="setting-group">
             <h4 class="setting-group-title">PLB 연계</h4>
             <div class="setting-grid">
-                <label>PLB 목표잔량 (Gcal) <input type="text" id="plbRecoveryTarget" value="200" title="PLB 투입 시 축열조를 이 수준까지만 회복"></label>
+                <label>PLB 기동레벨 (Gcal) <input type="text" id="plbRecoveryTarget" value="100" title="축열조가 이 수준 이하로 떨어지면 PLB 기동"></label>
+                <label>PLB 정지레벨 (Gcal) <input type="text" id="plbOffLevel" value="300" title="축열조가 이 수준 이상으로 올라가면 PLB 정지"></label>
+                <label>열량계획 탐색 (일) <input type="text" id="mpcLookahead" value="5" title="앞으로 며칠을 보고 축열 목표를 결정"></label>
             </div>
         </div>
     </div>
@@ -315,15 +337,23 @@
                 <tr><td>Cold Start</td><td>48시간+</td><td><input type="text" id="coldGasTotal" value="1500"></td></tr>
             </tbody>
         </table>
-        <div style="font-size:11px;font-weight:600;color:#475569;margin-top:14px">CHP</div>
+        <div style="font-size:11px;font-weight:600;color:#475569;margin-top:14px">CHP 운전 제약</div>
         <div class="setting-grid" style="margin-top:4px">
-            <label>최소운전시간 (h) <input type="text" id="chpMinRunHours" value="4"></label>
-            <label>최소정지시간 (h) <input type="text" id="chpMinStopHours" value="4"></label>
-            <label>최소부하 (%) <input type="text" id="chpMinLoad" value="60"></label>
+            <label>권장 최소운전 (h) <input type="text" id="chpMinRunHours" value="4"></label>
+            <label>권장 최소정지 (h) <input type="text" id="chpMinStopHours" value="4"></label>
+            <label>권장 최소부하 (%) <input type="text" id="chpMinLoad" value="60"></label>
         </div>
-        <div style="font-size:11px;font-weight:600;color:#475569;margin-top:10px">PLB</div>
+        <div class="setting-grid" style="margin-top:4px">
+            <label>절대 최소부하 (%) <input type="text" id="chpAbsMinLoad" value="20"></label>
+            <label>절대 최소정지 (h) <input type="text" id="chpAbsMinStopHours" value="1"></label>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:#475569;margin-top:10px">PLB 운전 제약</div>
         <div class="setting-grid" style="margin-top:4px">
             <label>최소운전시간 (h) <input type="text" id="plbMinRunHours" value="2"></label>
+            <label>최소정지시간 (h) <input type="text" id="plbMinStopHours" value="4"></label>
+            <label>기동 가스량 (Nm³) <input type="text" id="plbStartupGas" value="200"></label>
+            <label>권장 최소부하 (%) <input type="text" id="plbMinLoad" value="50"></label>
+            <label>절대 최소부하 (%) <input type="text" id="plbAbsMinLoad" value="20"></label>
         </div>
     </div>
 
