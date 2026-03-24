@@ -4384,6 +4384,12 @@ function _mpcSummarize(ctx, today, decision, block, plb, sim) {
 // 시뮬과 배치가 하나의 루프 — 불일치 원천 제거
 // ═══════════════════════════════════════════════════════════════
 
+// ┌─────────────────────────────────────────────────────┐
+// │  ★ CHP 스케줄링 (v8p8) — 잠금 구간 시작            │
+// │  이 함수는 PLB 추가 시 절대 수정하지 말 것           │
+// │  PLB는 이 함수의 결과를 받아 별도 함수에서 처리       │
+// │  기준: UF:11 OF:35 비용:515,376만 (2026-03-24)     │
+// └─────────────────────────────────────────────────────┘
 function _v8Dispatch(ctx, today) {
     const { storageCap, storageMin, perfOptions, minRunTime, dayInfo, storageMonthCap } = ctx;
     const d = dayInfo[today];
@@ -4408,7 +4414,6 @@ function _v8Dispatch(ctx, today) {
         // ══ 1b단계: 미래 잉여열 예측 (lookahead surplus drain) ══
         // 앞으로 3일간 CHP 없이 외부열만으로 축열이 얼마나 올라가는지 계산
         // 겨울에는 잉여 없음(0), 계절 전환기에만 양수
-        // storageTarget에서만 사용 (roughNeed에서는 capPreCharge로 대체)
         let surplusDrain = 0;
         const surplusLookahead = 3;
         for (let fd = today + 1; fd < Math.min(today + surplusLookahead, ctx.N); fd++) {
@@ -4637,6 +4642,7 @@ function _v8Dispatch(ctx, today) {
         maxStorage: Math.max(...hourly.map(h => h.storage))
     };
 }
+// └─── CHP 스케줄링 (v8p8) 잠금 구간 끝 ───┘
 
 function _v6CalcNetDemand(ctx, today) {
     const d = ctx.dayInfo[today];
