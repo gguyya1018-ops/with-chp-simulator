@@ -1123,7 +1123,7 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
 }
 .wf-step.active .wf-step-icon svg { color:#60a5fa; }
 .wf-step.active .wf-step-label { color:#93c5fd; }
-.wf-step.active .wf-step-fill { width:60%; background:#3b82f6; }
+.wf-step.active .wf-step-fill { background:#3b82f6; }
 .wf-step.active + .wf-conn svg { color:#3b82f6; }
 
 .wf-step.done {
@@ -1134,7 +1134,7 @@ th.calc-col { background:rgba(75,131,240,.1) !important; color:#4B83F0; }
 }
 .wf-step.done .wf-step-icon svg { color:#4ade80; }
 .wf-step.done .wf-step-label { color:#86efac; }
-.wf-step.done .wf-step-fill { width:100%; background:#22c55e; }
+.wf-step.done .wf-step-fill { background:#22c55e; }
 .wf-step.done + .wf-conn svg { color:#22c55e; }
 
 @keyframes wfBounce {
