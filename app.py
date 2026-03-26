@@ -163,7 +163,18 @@ class Api:
             window.restore()
             self._maximized = False
         else:
-            window.maximize()
+            # 작업표시줄을 제외한 작업영역 크기로 최대화
+            try:
+                user32 = ctypes.windll.user32
+                # SPI_GETWORKAREA (48) → 작업표시줄 제외 영역
+                rect = ctypes.wintypes.RECT()
+                ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(rect), 0)
+                w = rect.right - rect.left
+                h = rect.bottom - rect.top
+                window.move(rect.left, rect.top)
+                window.resize(w, h)
+            except Exception:
+                window.maximize()
             self._maximized = True
 
     def win_close(self):

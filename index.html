@@ -101,7 +101,7 @@
         <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         <button class="pipe-step locked" data-tab="tab-cost" data-step="4">
             <span class="pipe-num"><span class="pipe-num-text">5</span><svg class="pipe-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-            <span class="pipe-label">비용산출</span>
+            <span class="pipe-label">계산검증</span>
             <span class="pipe-status"></span>
         </button>
         <span class="pipe-arrow"><svg viewBox="0 0 20 12"><path d="M0 6h16l-4-4M16 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -218,17 +218,17 @@
         <button class="step-btn" data-step="step_startup">
             <span class="step-num">4</span>기동조건
         </button>
-        <button class="step-btn" data-step="step_maintenance">
-            <span class="step-num">5</span>정비일정
-        </button>
         <button class="step-btn" data-step="step_pricing">
-            <span class="step-num">6</span>전력정산 계수
-        </button>
-        <button class="step-btn" data-step="step_ext_sources">
-            <span class="step-num">7</span>외부수열원 관리
+            <span class="step-num">5</span>전력정산 계수
         </button>
         <button class="step-btn" data-step="step_elec_demand">
-            <span class="step-num">8</span>전력수요 모델링
+            <span class="step-num">6</span>전력수요 모델링
+        </button>
+        <button class="step-btn" data-step="step_ext_sources">
+            <span class="step-num">7</span>열원적용 설정
+        </button>
+        <button class="step-btn" data-step="step_maintenance">
+            <span class="step-num">8</span>정비일정
         </button>
     </div>
 
@@ -430,11 +430,55 @@
         </table>
     </div>
 
-    <!-- Step 7: 외부수열원 관리 -->
+    <!-- Step 7: 열원적용 설정 -->
     <div class="step-panel" id="step_ext_sources">
-        <h3>외부수열원 활성/비활성</h3>
-        <p class="hint">시뮬레이션에 포함할 열원을 토글로 관리합니다. 수열원 추가는 데이터 > 외부거래 탭에서 할 수 있습니다.</p>
-        <div id="extSourcesTable"></div>
+        <h3>열원적용 설정</h3>
+        <p class="hint">시뮬레이션에 포함할 열원을 토글로 관리합니다.</p>
+
+        <div class="src-layout">
+            <!-- 자체 열원 (왼쪽) -->
+            <div class="src-section">
+                <div class="src-section-head">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    <span>자체 열원</span>
+                </div>
+                <table class="settings-tbl ext-src-tbl">
+                    <thead><tr><th>이름</th><th>유형</th><th>활성</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-weight:500;color:#d0d0d0">CHP</td>
+                            <td><span class="ext-type-badge ext-type-self">열병합</span></td>
+                            <td><label class="ext-toggle"><input type="checkbox" id="chpEnabled" checked onchange="scheduleSettingsSave()"><span class="ext-toggle-slider"></span></label></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:500;color:#d0d0d0">#1 PLB</td>
+                            <td><span class="ext-type-badge ext-type-self">보일러</span></td>
+                            <td><label class="ext-toggle"><input type="checkbox" id="plb1Enabled" checked onchange="scheduleSettingsSave()"><span class="ext-toggle-slider"></span></label></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:500;color:#d0d0d0">#2 PLB</td>
+                            <td><span class="ext-type-badge ext-type-self">보일러</span></td>
+                            <td><label class="ext-toggle"><input type="checkbox" id="plb2Enabled" checked onchange="scheduleSettingsSave()"><span class="ext-toggle-slider"></span></label></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:500;color:#d0d0d0">#3 PLB</td>
+                            <td><span class="ext-type-badge ext-type-self">보일러</span></td>
+                            <td><label class="ext-toggle"><input type="checkbox" id="plb3Enabled" checked onchange="scheduleSettingsSave()"><span class="ext-toggle-slider"></span></label></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 외부 열원 (오른쪽) -->
+            <div class="src-section">
+                <div class="src-section-head">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+                    <span>외부 열원</span>
+                    <span class="hint" style="margin-left:8px;font-size:11px">수열원 추가는 데이터 > 외부거래 탭에서</span>
+                </div>
+                <div id="extSourcesTable"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Step 8: 전력수요 모델링 -->
@@ -647,53 +691,42 @@
     <div id="planSimResult" style="display:none">
         <!-- 용어 안내 제거 -->
         <div class="inner-tabs" id="planTabs" style="margin-top:16px">
-            <button class="inner-tab active" data-ptab="plan_monthly_sim">월별</button>
-            <button class="inner-tab" data-ptab="plan_daily">일별</button>
-            <span style="font-size:11px;color:#94a3b8;margin-left:8px;align-self:center">월별 요약 또는 일별 상세를 확인합니다. 일별에서 행을 클릭하면 시간별 운전현황을 볼 수 있습니다.</span>
+            <button class="inner-tab active" data-ptab="plan_daily">일별</button>
+            <button class="inner-tab" data-ptab="plan_monthly_sim">월별</button>
+            <span style="font-size:11px;color:#94a3b8;margin-left:8px;align-self:center">일별에서 행을 클릭하면 시간별 운전현황을 볼 수 있습니다.</span>
         </div>
-        <div class="plan-panel active" id="plan_monthly_sim"><div id="pv_plan_monthly_sim"></div></div>
-        <div class="plan-panel" id="plan_daily"><div id="pv_plan_daily"></div></div>
+        <div class="plan-panel active" id="plan_daily"><div id="pv_plan_daily"></div></div>
+        <div class="plan-panel" id="plan_monthly_sim"><div id="pv_plan_monthly_sim"></div></div>
     </div>
 </div>
 
 <!-- ─── 비용산출 탭 ─── -->
 <div class="tab-content" id="tab-cost">
     <div class="section-bar">
-        <span class="section-title">비용산출</span>
+        <span class="section-title">계산검증</span>
     </div>
-    <p class="tab-guide">기동계획 결과를 바탕으로 전력수요 모델링 및 비용을 상세 분석합니다</p>
+    <p class="tab-guide">기동계획 결과의 비용·수입 항목을 수량×단가로 검산합니다</p>
     <div class="inner-tabs" id="costTabs">
-        <button class="inner-tab active" data-costtab="cost_elec_demand">전력수요</button>
-        <button class="inner-tab" data-costtab="cost_elec_cost">전력비</button>
-        <button class="inner-tab" data-costtab="cost_gas">가스비</button>
-        <button class="inner-tab" data-costtab="cost_water_chem">용수약품비</button>
-        <button class="inner-tab" data-costtab="cost_ext_heat">수열비</button>
+        <button class="inner-tab active" data-costtab="cv_self">자체열원</button>
+        <button class="inner-tab" data-costtab="cv_ext">외부수열</button>
+        <button class="inner-tab" data-costtab="cv_sales">열판매 수입</button>
+        <button class="inner-tab" data-costtab="cv_summary">종합 손익</button>
     </div>
-    <div class="cost-panel active" id="cost_elec_demand">
-        <div class="pv-body" id="pv_calc_elec_demand">
-            <p class="hint">수전량 데이터를 업로드하고 기동계획을 실행하면 전력수요 프로파일이 표시됩니다</p>
-        </div>
+    <!-- 각 탭 공통: 고정 컨트롤 + 스크롤 테이블 -->
+    <div id="cvFixedControls"></div>
+    <div class="cost-panel active" id="cv_self">
+        <div class="pv-body" id="pv_cv_self"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
     </div>
-    <div class="cost-panel" id="cost_elec_cost">
-        <div class="pv-body" id="pv_calc_elec_cost">
-            <p class="hint">기동계획 실행 후 실적/계획 전력비가 비교 표시됩니다</p>
-        </div>
+    <div class="cost-panel" id="cv_ext">
+        <div class="pv-body" id="pv_cv_ext"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
     </div>
-    <div class="cost-panel" id="cost_gas">
-        <div class="pv-body" id="pv_cost_gas">
-            <p class="hint">기동계획 실행 후 가스비가 표시됩니다</p>
-        </div>
+    <div class="cost-panel" id="cv_sales">
+        <div class="pv-body" id="pv_cv_sales"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
     </div>
-    <div class="cost-panel" id="cost_water_chem">
-        <div class="pv-body" id="pv_cost_water_chem">
-            <p class="hint">기동계획 실행 후 용수약품비가 표시됩니다</p>
-        </div>
+    <div class="cost-panel" id="cv_summary">
+        <div class="pv-body" id="pv_cv_summary"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
     </div>
-    <div class="cost-panel" id="cost_ext_heat">
-        <div class="pv-body" id="pv_cost_ext_heat">
-            <p class="hint">기동계획 실행 후 수열비가 표시됩니다</p>
-        </div>
-    </div>
+
 </div>
 
 <!-- ─── 운영손익 탭 ─── -->

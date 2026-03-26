@@ -381,7 +381,7 @@ function renderEditableMonthly(key) {
         firstColGen = i => (i + 1) + 'h';
     } else return;
 
-    // 열요금표: 계산 컬럼 추가 (업무용냉방, 공공용냉방) + 수영장비율 데이터 컬럼
+    // 열요금표: 계산 컬럼 추가 (업무용냉방, 공공용냉방, 공공용수영장)
     const isHeatRate = (key === 'heat_rate_table');
     const heatColOrder = isHeatRate ? [
         { type:'data', idx:0, label:'월' },
@@ -391,8 +391,8 @@ function renderEditableMonthly(key) {
         { type:'calc', label:'업무용(냉방)' },
         { type:'data', idx:4, label:'공공용' },
         { type:'calc', label:'공공용(냉방)' },
-        { type:'data', idx:5, label:'공공용(수영장)' },
-        { type:'data', idx:6, label:'수영장비율(%)' },
+        { type:'calc', label:'공공용(수영장)', tooltip:'공공용 × 50% 할인단가' },
+        { type:'data', idx:6, label:'수영장비율(%)', tooltip:'공공용 Gcal 중 수영장 비중' },
         { type:'data', idx:7, label:'순추절기' },
     ] : null;
 
@@ -414,7 +414,10 @@ function renderEditableMonthly(key) {
     const customCols = heatColOrder || ngColOrder;
     let html = `<table class="pv-tbl editable-tbl" data-key="${key}"><thead><tr>`;
     if (customCols) {
-        customCols.forEach(col => html += col.type === 'calc' ? `<th class="calc-col">${col.label}</th>` : `<th>${col.label}</th>`);
+        customCols.forEach(col => {
+            const tip = col.tooltip ? ` title="${col.tooltip}"` : '';
+            html += col.type === 'calc' ? `<th class="calc-col"${tip}>${col.label}</th>` : `<th${tip}>${col.label}</th>`;
+        });
     } else {
         tmpl.headers.forEach(h => html += `<th>${h}</th>`);
     }
@@ -427,6 +430,7 @@ function renderEditableMonthly(key) {
             const row = d && d.rows[i] ? d.rows[i] : null;
             const 업무용 = row ? (Number(row[3]) || 0) : 0;
             const 공공용 = row ? (Number(row[4]) || 0) : 0;
+            const 수영장비율 = row ? (Number(row[6]) || 0) : 0;
             const isCool = (m >= 5 && m <= 9);
             heatColOrder.forEach(col => {
                 if (col.type === 'data' && col.idx === 0) {
@@ -438,6 +442,8 @@ function renderEditableMonthly(key) {
                     html += `<td class="calc-col">${(isCool ? Math.round(업무용 * 0.4) : 업무용).toLocaleString()}</td>`;
                 } else if (col.label === '공공용(냉방)') {
                     html += `<td class="calc-col">${(isCool ? Math.round(공공용 * 0.4) : 공공용).toLocaleString()}</td>`;
+                } else if (col.label === '공공용(수영장)') {
+                    html += `<td class="calc-col">${Math.round(공공용 * 0.5).toLocaleString()}</td>`;
                 }
             });
         } else if (isNgPrice) {
@@ -774,6 +780,12 @@ function collectSettings() {
         ui.pricingHeatTable.push([...tr.querySelectorAll('input')].map(inp => inp.value));
     });
 
+    // 자체 열원 활성/비활성
+    ui.chpEnabled = document.getElementById('chpEnabled')?.checked !== false;
+    ui.plb1Enabled = document.getElementById('plb1Enabled')?.checked !== false;
+    ui.plb2Enabled = document.getElementById('plb2Enabled')?.checked !== false;
+    ui.plb3Enabled = document.getElementById('plb3Enabled')?.checked !== false;
+
     // 외부수열원 레지스트리
     ui.extSources = JSON.parse(JSON.stringify(EXT_SOURCES));
 
@@ -847,6 +859,16 @@ function applySettings(ui) {
         });
         updatePricingCalc();
     }
+
+    // 자체 열원 활성/비활성 복원
+    const chpEl = document.getElementById('chpEnabled');
+    if (chpEl) chpEl.checked = ui.chpEnabled !== false;
+    const plb1El = document.getElementById('plb1Enabled');
+    if (plb1El) plb1El.checked = ui.plb1Enabled !== false;
+    const plb2El = document.getElementById('plb2Enabled');
+    if (plb2El) plb2El.checked = ui.plb2Enabled !== false;
+    const plb3El = document.getElementById('plb3Enabled');
+    if (plb3El) plb3El.checked = ui.plb3Enabled !== false;
 
     // 외부수열원 레지스트리 복원
     if (ui.extSources && Array.isArray(ui.extSources)) {
@@ -3217,14 +3239,15 @@ function runMILPOptimization() {
 
             document.querySelectorAll('#planTabs .inner-tab').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.plan-panel').forEach(p => p.classList.remove('active'));
-            document.querySelector('#planTabs .inner-tab[data-ptab="plan_monthly_sim"]')?.classList.add('active');
-            document.getElementById('plan_monthly_sim')?.classList.add('active');
+            document.querySelector('#planTabs .inner-tab[data-ptab="plan_daily"]')?.classList.add('active');
+            document.getElementById('plan_daily')?.classList.add('active');
 
             renderPlanMonthly(simResults);
             renderPlanCharts(simResults);
             renderPlanDaily(simResults);
             renderContribution(simResults);
             renderAllCosts(simResults);
+            renderCostVerify(simResults);
 
             const btnLogic = document.getElementById('btnShowLogicFlow');
             if (btnLogic) btnLogic.style.display = '';
@@ -3251,7 +3274,7 @@ async function solveMPCAsync(horizon, onProgress) {
         function runChunk() {
             const chunkEnd = Math.min(today + 1, N);
             while (today < chunkEnd) {
-                const dispatch = _v8Dispatch(ctx, today);
+                const dispatch = ctx.chpEnabled ? _v8Dispatch(ctx, today) : _noChpDispatch(ctx, today);
                 const { block, decision } = dispatch;
 
                 // PLB 투입 판단 (CHP 결과 위에 얹음, CHP 불변)
@@ -3642,9 +3665,16 @@ function _mpcInit(horizon) {
     const days = buildDailyData();
     if (!days || days.length === 0) return null;
 
+    // 열원 활성 상태
+    const chpEnabled   = document.getElementById('chpEnabled')?.checked !== false;
+    const plb1On       = document.getElementById('plb1Enabled')?.checked !== false;
+    const plb2On       = document.getElementById('plb2Enabled')?.checked !== false;
+    const plb3On       = document.getElementById('plb3Enabled')?.checked !== false;
+    const plbEnabledCount = (plb1On ? 1 : 0) + (plb2On ? 1 : 0) + (plb3On ? 1 : 0);
+
     // 설정값
     const chpLoadTable = getChpLoadTable();
-    const plbCount     = parseInt(document.getElementById('plbCount')?.value) || 3;
+    const plbCount     = Math.min(parseInt(document.getElementById('plbCount')?.value) || 3, plbEnabledCount);
     const plbTable     = getPlbLoadTable();
     const plbMaxCap    = plbTable.length > 0 ? plbTable[0].열Gcal : 68.8;
     const storageCap   = parseFloat(document.getElementById('storageCapacity')?.value) || 1500;
@@ -3708,7 +3738,7 @@ function _mpcInit(horizon) {
         mpcLookahead: parseInt(document.getElementById('mpcLookahead')?.value) || 5,
         // 권장 제약 (운영 효율)
         storageCap, storageMin, storageMonthCap, minRunTime, minStopTime, plbMinRunHours, plbMinStopHours,
-        plbCount, plbMaxCap, plb1DayCap, plbTable, plbRef,
+        chpEnabled, plbCount, plbMaxCap, plb1DayCap, plbTable, plbRef,
         startupGasTotal,
         // 충방열률 제약
         storageChargeRate: parseFloat(document.getElementById('storageChargeRate')?.value) || 50,
@@ -4401,7 +4431,7 @@ function _mpcSummarize(ctx, today, decision, block, plb, sim) {
         totalNetCost: chpNetCost + plbFuelCost + startupCost,
         chpCostPerGcal, plbCostPerGcal: plbHeat > 0 ? Math.round(plbFuelCost / plbHeat) : 0,
         plbRefCostPerGcal: Math.round(d.plbCostPerGcal),
-        ngCostNm3: d.ngCostNm3,
+        ngCostNm3: d.ngCostNm3, ngPLBNm3: d.ngPLBNm3,
         dayType: d.isMaint ? '정비' : (d.isHoliday ? '공휴일' : (d.isWeekend ? '주말' : '평일')),
     };
 }
@@ -4418,6 +4448,33 @@ function _mpcSummarize(ctx, today, decision, block, plb, sim) {
 // │  PLB는 이 함수의 결과를 받아 별도 함수에서 처리       │
 // │  기준: UF:11 OF:35 비용:515,376만 (2026-03-24)     │
 // └─────────────────────────────────────────────────────┘
+
+// CHP 비활성 시 빈 dispatch 반환 (축열만 감소)
+function _noChpDispatch(ctx, today) {
+    const d = ctx.dayInfo[today];
+    const { storageCap, storageMin } = ctx;
+    let st = ctx.storageLevel;
+    const hourly = [];
+    for (let h = 0; h < 24; h++) {
+        const demand = d.demandH[h];
+        const ext = d.extH ? d.extH[h] : 0;
+        const net = demand - ext;
+        st = Math.max(0, Math.min(storageCap, st - Math.max(0, net)));
+        if (ext > demand) st = Math.min(storageCap, st + (ext - demand));
+        hourly.push({ chp: 0, chpPowerKWh: 0, demand, ext, storage: Math.round(st), plb: 0 });
+    }
+    const block = { chpStart: 0, chpHours: 0 };
+    const decision = { chpHeatPerH: 0, chpLoadPct: 0, perf: d.costs[0] || {}, startupCost: 0, chpHours: 0, chpStart: 0, chpHeatArr: null };
+    const plb = { plbHeat: 0, plbUnits: 0, plbHours: 0, plbNg: 0, plbLoad: 0, plbStartH: 0 };
+    return {
+        block, decision, plb, hourly,
+        finalStorage: Math.round(st),
+        startStorage: Math.round(ctx.storageLevel),
+        minStorage: Math.min(...hourly.map(h => h.storage)),
+        maxStorage: Math.max(...hourly.map(h => h.storage))
+    };
+}
+
 function _v8Dispatch(ctx, today) {
     const { storageCap, storageMin, perfOptions, minRunTime, dayInfo, storageMonthCap } = ctx;
     const d = dayInfo[today];
@@ -6490,6 +6547,1345 @@ function calcHeatSalesMonthly() {
     return result;
 }
 
+// ─── 열판매 항목별 상세 (월별) ───
+function calcHeatSalesMonthlyDetail() {
+    if (!DATA.sales_hourly && !DATA.sales_daily) return null;
+    const findCol = (headers, name) => headers.findIndex(h => h === name);
+    const heatItemDefs = [
+        { name: '주택용', key: '주택용난방', rateKey: '주택용' },
+        { name: '업무용난방', key: '업무용난방', rateKey: '업무용' },
+        { name: '업무용냉방', key: '업무용냉방', rateKey: '업무용' },
+        { name: '공공용난방', key: '공공용난방', rateKey: '공공용' },
+        { name: '공공용냉방', key: '공공용냉방', rateKey: '공공용' },
+    ];
+
+    // sales_hourly → 일별 항목별 합산
+    const dailyHeatQty = {};
+    if (DATA.sales_hourly) {
+        const shH = DATA.sales_hourly.headers;
+        const colMap = {};
+        heatItemDefs.forEach(def => { colMap[def.key] = findCol(shH, def.key); });
+        DATA.sales_hourly.rows.forEach(row => {
+            const key = `${Number(row[0])}-${Number(row[1])}`;
+            if (!dailyHeatQty[key]) dailyHeatQty[key] = {};
+            heatItemDefs.forEach(def => {
+                const ci = colMap[def.key];
+                if (ci >= 0) dailyHeatQty[key][def.key] = (dailyHeatQty[key][def.key] || 0) + (Number(row[ci]) || 0);
+            });
+        });
+    }
+
+    // 인테코 판매량
+    const intecoQtyMap = {};
+    if (DATA.sales_daily) {
+        const sdH = DATA.sales_daily.headers;
+        const intecoCol = findCol(sdH, '인테코');
+        if (intecoCol >= 0) DATA.sales_daily.rows.forEach(row => { intecoQtyMap[`${Number(row[0])}-${Number(row[1])}`] = Number(row[intecoCol]) || 0; });
+    }
+
+    // 열요금 단가
+    const heatRateMap = {};
+    const baseFeeMap = {};
+    const swimRatioMap = {};
+    if (DATA.heat_rate_table) {
+        const hrH = DATA.heat_rate_table.headers;
+        const bfIdx = hrH.indexOf('기본료');
+        const swimIdx = hrH.indexOf('수영장비율(%)');
+        DATA.heat_rate_table.rows.forEach(row => {
+            const m = Number(row[0]);
+            const entry = {};
+            hrH.forEach((h, i) => { if (i > 0) entry[h] = parseNum(row[i]); });
+            heatRateMap[m] = entry;
+            if (bfIdx >= 0) baseFeeMap[m] = parseNum(row[bfIdx]);
+            if (swimIdx >= 0) swimRatioMap[m] = parseNum(row[swimIdx]);
+        });
+    }
+
+    // 인테코 판매 단가
+    const intecoPriceMap = {};
+    if (DATA.sale_prices_daily) {
+        const prH = DATA.sale_prices_daily.headers;
+        const ipCol = prH.indexOf('인테코(판매)');
+        if (ipCol >= 0) DATA.sale_prices_daily.rows.forEach(row => { intecoPriceMap[`${Number(row[0])}-${Number(row[1])}`] = parseNum(row[ipCol]); });
+    }
+
+    // 월별 항목별 집계
+    const result = {};
+    for (let m = 1; m <= 12; m++) {
+        result[m] = { baseFee: baseFeeMap[m] || 0, items: {}, total: 0 };
+        heatItemDefs.forEach(def => result[m].items[def.name] = { qty: 0, rev: 0 });
+        result[m].items['공공용수영장'] = { qty: 0, rev: 0 };
+        result[m].items['인테코'] = { qty: 0, rev: 0 };
+    }
+
+    const allDayKeys = new Set([...Object.keys(dailyHeatQty), ...Object.keys(intecoQtyMap)]);
+    allDayKeys.forEach(key => {
+        const m = Number(key.split('-')[0]);
+        if (m < 1 || m > 12) return;
+        const rates = heatRateMap[m] || {};
+        const hq = dailyHeatQty[key] || {};
+        const swimRatio = swimRatioMap[m] || 0;
+
+        heatItemDefs.forEach(def => {
+            let qty = hq[def.key] || 0;
+            let price = rates[def.rateKey] || 0;
+
+            // 공공용난방: 수영장비율 만큼 분리
+            if (def.key === '공공용난방' && swimRatio > 0) {
+                const swimQty = qty * swimRatio;
+                const normalQty = qty - swimQty;
+                const swimPrice = Math.round((rates['공공용'] || 0) * 0.5);
+                result[m].items['공공용수영장'].qty += swimQty;
+                result[m].items['공공용수영장'].rev += Math.round(swimQty * swimPrice);
+                qty = normalQty;
+            }
+            result[m].items[def.name].qty += qty;
+            result[m].items[def.name].rev += Math.round(qty * price);
+        });
+
+        // 인테코
+        const intecoQty = intecoQtyMap[key] || 0;
+        const intecoPrice = intecoPriceMap[key] || 0;
+        result[m].items['인테코'].qty += intecoQty;
+        result[m].items['인테코'].rev += Math.round(intecoQty * intecoPrice);
+    });
+
+    for (let m = 1; m <= 12; m++) {
+        let usageRev = 0;
+        Object.values(result[m].items).forEach(it => usageRev += it.rev);
+        result[m].total = result[m].baseFee + usageRev;
+    }
+    return result;
+}
+
+// ─── 외부수열비 열원별 상세 (월별) ───
+function calcExternalHeatMonthlyDetail() {
+    if (!DATA.operations_daily || !DATA.sale_prices_daily) return null;
+    const oH = DATA.operations_daily.headers;
+    const pH = DATA.sale_prices_daily.headers;
+    const extMap = EXT_SOURCES.filter(s => s.enabled).map(s => ({ opsName: s.opsName, priceName: s.priceName }));
+    const sources = extMap.map(e => ({ name: e.opsName, opsCol: oH.indexOf(e.opsName), priceCol: pH.indexOf(e.priceName) })).filter(s => s.opsCol >= 0);
+    if (sources.length === 0) return null;
+
+    const priceMap = {};
+    DATA.sale_prices_daily.rows.forEach(row => {
+        const m = Number(row[0]), d = Number(row[1]);
+        priceMap[`${m}-${d}`] = {};
+        sources.forEach(s => { if (s.priceCol >= 0) priceMap[`${m}-${d}`][s.name] = parseNum(row[s.priceCol]); });
+    });
+
+    const result = {};
+    const qtyResult = {};
+    for (let m = 1; m <= 12; m++) {
+        result[m] = { _total: 0 };
+        qtyResult[m] = { _total: 0 };
+        sources.forEach(s => { result[m][s.name] = 0; qtyResult[m][s.name] = 0; });
+    }
+    DATA.operations_daily.rows.forEach(row => {
+        const m = Number(row[0]), d = Number(row[1]);
+        if (m < 1 || m > 12) return;
+        const prices = priceMap[`${m}-${d}`] || {};
+        sources.forEach(s => {
+            const qty = parseNum(row[s.opsCol]);
+            const cost = Math.round(qty * (prices[s.name] || 0));
+            result[m][s.name] += cost;
+            result[m]._total += cost;
+            qtyResult[m][s.name] += qty;
+            qtyResult[m]._total += qty;
+        });
+    });
+    return { cost: result, qty: qtyResult, sourceNames: sources.map(s => s.name) };
+}
+
+// ─── 계산검증 탭 렌더링 ───
+let _cvCache = null;
+let _cvCurrentTab = 'cv_self';
+let _cvCurrentMonth = 1;
+let _cvCurrentView = 'daily';
+
+function renderCostVerify(simResults) {
+    if (!simResults || !simResults.length) {
+        ['pv_cv_self','pv_cv_ext','pv_cv_sales','pv_cv_summary'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<p class="hint">기동계획 실행 후 표시됩니다</p>';
+        });
+        return;
+    }
+    _cvCache = {
+        simResults,
+        monthly: aggregateMonthly(simResults),
+        heatSales: calcHeatSalesMonthlyDetail(),
+        extHeat: calcExternalHeatMonthlyDetail()
+    };
+    _cvRenderControls();
+    _cvRenderCurrentTab();
+}
+
+function _cvRenderControls() {
+    const fixedEl = document.getElementById('cvFixedControls');
+    if (!fixedEl) return;
+    let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+    html += `<button class="cd-tab${_cvCurrentView === 'daily' ? ' active' : ''}" onclick="_cvSetView('daily')">일별</button>`;
+    html += `<button class="cd-tab${_cvCurrentView === 'monthly' ? ' active' : ''}" onclick="_cvSetView('monthly')">월별</button>`;
+    if (_cvCurrentView === 'daily') {
+        html += '<span style="width:1px;height:20px;background:#334155;margin:0 4px"></span>';
+        for (let m = 1; m <= 12; m++) {
+            html += `<button class="cd-month-btn${m === _cvCurrentMonth ? ' active' : ''}" onclick="_cvSetMonth(${m})">${m}월</button> `;
+        }
+    }
+    html += '</div>';
+    fixedEl.innerHTML = html;
+    // 스타일 주입
+    if (!document.getElementById('cd-tab-style')) {
+        const st = document.createElement('style');
+        st.id = 'cd-tab-style';
+        st.textContent = `.cd-tab{padding:5px 14px;border:1px solid #334155;border-radius:8px;background:transparent;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}.cd-tab:hover{background:rgba(51,65,85,0.4);color:#e2e8f0}.cd-tab.active{background:rgba(59,130,246,0.2);border-color:rgba(59,130,246,0.5);color:#93c5fd}.cd-month-btn{padding:3px 9px;border:1px solid #475569;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;background:#1e293b;color:#94a3b8;transition:all .15s}.cd-month-btn:hover{background:#334155;color:#e2e8f0}.cd-month-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}`;
+        document.head.appendChild(st);
+    }
+}
+
+function _cvSetView(view) {
+    _cvCurrentView = view;
+    _cvRenderControls();
+    _cvRenderCurrentTab();
+}
+function _cvSetMonth(m) {
+    _cvCurrentMonth = m;
+    _cvRenderControls();
+    _cvRenderCurrentTab();
+}
+function _cvRenderCurrentTab() {
+    const tab = _cvCurrentTab;
+    if (tab === 'cv_self') _cvRenderSelf();
+    else if (tab === 'cv_ext') _cvRenderExt();
+    else if (tab === 'cv_sales') _cvRenderSales();
+    else if (tab === 'cv_summary') _cvRenderSummary();
+}
+
+// ── 공통 유틸 ──
+function _cvFmt() {
+    const fmtW = v => v === 0 ? '-' : Math.round(v / 10000).toLocaleString();
+    const fmtN = v => v === 0 ? '-' : Math.round(v).toLocaleString();
+    const fmtQ = v => v === 0 ? '-' : v.toFixed(1);
+    const C = '#c0c8d8';
+    const R = 'text-align:right';
+    const V = 'text-align:center;padding:2px';
+    const chk = (calc, sim) => {
+        const diff = calc - sim; const ad = Math.abs(diff);
+        if (ad <= 100) return '<span style="color:#4ade80">\u2713</span>';
+        const dw = Math.round(diff / 10000);
+        if (dw === 0) return '<span style="color:#a3e635">\u2248</span>';
+        const s = dw > 0 ? '+' : '', c = dw > 0 ? '#f87171' : '#60a5fa';
+        return `<span style="color:${c}">(${s}${dw.toLocaleString()})</span>`;
+    };
+    return { fmtW, fmtN, fmtQ, C, R, V, chk };
+}
+
+// ══════════════════════════════════════
+//  자체열원 탭
+// ══════════════════════════════════════
+function _cvRenderSelf() {
+    const el = document.getElementById('pv_cv_self');
+    if (!el || !_cvCache) return;
+    const c = _cvCache;
+    const { fmtW, fmtN, fmtQ, C, R, V, chk } = _cvFmt();
+
+    if (_cvCurrentView === 'monthly') {
+        // 월별
+        const wcM = calcWaterChemMonthly();
+        const elecM = typeof calcElecCostMonthly === 'function' ? calcElecCostMonthly({ source:'planned', simResults: c.simResults }) : null;
+        const data = [];
+        for (let m = 1; m <= 12; m++) {
+            const b = c.monthly[m - 1];
+            let calcChp = 0, calcPlb = 0, calcElec = 0;
+            c.simResults.filter(r => r.month === m).forEach(r => {
+                calcChp += Math.round((r.chpNg || 0) * (r.ngCostNm3 || 0));
+                calcPlb += Math.round((r.plbNg || 0) * (r.ngPLBNm3 || 0));
+                if (r.hourly) r.hourly.forEach(hr => { if (hr.chpPowerKWh > 0) calcElec += (hr.mp || 0) * hr.chpPowerKWh; });
+            });
+            calcElec = Math.round(calcElec);
+            const elecCost = elecM?.[m]?.total || 0;
+            const wc = wcM?.[m] || { waterCost:0, chemTotal:0, total:0 };
+            const net = b.chpFuelCost + b.startupCost + b.plbFuelCost + elecCost + wc.total - b.chpElecRev - b.cpCharge;
+            data.push({ m, chpFuel: b.chpFuelCost, calcChp, startup: b.startupCost, chpHeat: b.chpHeat,
+                plbFuel: b.plbFuelCost, calcPlb, elecRev: b.chpElecRev, calcElec, cp: b.cpCharge,
+                elecCost, water: wc.waterCost, chem: wc.chemTotal, net });
+        }
+        let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
+        html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
+        html += `<th>CHP가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>기동비<br><span style="color:#475569">(만원)</span></th><th>CHP열량<br><span style="color:#475569">(Gcal)</span></th>`;
+        html += `<th>PLB가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#60a5fa">전력판매<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#60a5fa">CP<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>전력비<br><span style="color:#475569">(만원)</span></th><th>용수비<br><span style="color:#475569">(만원)</span></th><th>약품비<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="font-weight:700">순비용<br><span style="color:#475569">(만원)</span></th>`;
+        html += '</tr></thead><tbody>';
+        const tot = { chpFuel:0, calcChp:0, startup:0, chpHeat:0, plbFuel:0, calcPlb:0, elecRev:0, calcElec:0, cp:0, elecCost:0, water:0, chem:0, net:0 };
+        data.forEach(d => {
+            Object.keys(tot).forEach(k => tot[k] += d[k] || 0);
+            const nc = d.net > 0 ? '#f87171' : '#4ade80';
+            html += `<tr><td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${d.m}월</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(d.chpFuel)}</td><td style="${V}">${chk(d.calcChp, d.chpFuel)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(d.startup)}</td><td style="${R};color:${C}">${fmtQ(d.chpHeat)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(d.plbFuel)}</td><td style="${V}">${chk(d.calcPlb, d.plbFuel)}</td>`;
+            html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(d.elecRev)}</td><td style="${V}">${chk(d.calcElec, d.elecRev)}</td>`;
+            html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(d.cp)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(d.elecCost)}</td><td style="${R};color:${C}">${fmtW(d.water)}</td><td style="${R};color:${C}">${fmtW(d.chem)}</td>`;
+            html += `<td style="${R};font-weight:700;color:${nc}">${fmtW(d.net)}</td></tr>`;
+        });
+        const tnc = tot.net > 0 ? '#f87171' : '#4ade80';
+        html += `<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b"><td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(tot.chpFuel)}</td><td style="${V}">${chk(tot.calcChp, tot.chpFuel)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(tot.startup)}</td><td style="${R};color:${C}">${fmtQ(tot.chpHeat)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(tot.plbFuel)}</td><td style="${V}">${chk(tot.calcPlb, tot.plbFuel)}</td>`;
+        html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(tot.elecRev)}</td><td style="${V}">${chk(tot.calcElec, tot.elecRev)}</td>`;
+        html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(tot.cp)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(tot.elecCost)}</td><td style="${R};color:${C}">${fmtW(tot.water)}</td><td style="${R};color:${C}">${fmtW(tot.chem)}</td>`;
+        html += `<td style="${R};font-weight:800;color:${tnc}">${fmtW(tot.net)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+    } else {
+        // 일별
+        const days = c.simResults.filter(r => r.month === _cvCurrentMonth);
+        let cpWd = 0, cpHol = 0;
+        if (DATA.cp_monthly) {
+            const cpH = DATA.cp_monthly.headers;
+            DATA.cp_monthly.rows.forEach(row => {
+                if (Number(row[0]) === _cvCurrentMonth) {
+                    cpWd = Number(row[cpH.indexOf('평일CP')]) || 0;
+                    cpHol = Number(row[cpH.indexOf('휴일CP')]) || 0;
+                }
+            });
+        }
+
+        // 용수약품 일별 데이터
+        const wcDaily = {};
+        if (DATA.water_chem_daily && DATA.water_price_monthly && DATA.chem_price_monthly) {
+            const wpMap = {}, cpMap2 = {};
+            DATA.water_price_monthly.rows.forEach(r => { wpMap[Number(r[0])] = parseNum(r[3]) || parseNum(r[2]) || 0; });
+            DATA.chem_price_monthly.rows.forEach(r => { const m2 = Number(r[0]); cpMap2[m2] = { a:parseNum(r[1]),b:parseNum(r[2]),c:parseNum(r[3]),d:parseNum(r[4]),e:parseNum(r[5]),f:parseNum(r[6]) }; });
+            DATA.water_chem_daily.rows.forEach(row => {
+                const m2 = Number(row[0]), d2 = Number(row[1]); if (m2 !== _cvCurrentMonth) return;
+                const wq = parseNum(row[2]), wc = Math.round(wq * (wpMap[m2]||0));
+                const cp2 = cpMap2[m2] || {};
+                let chemT = 0; [cp2.a,cp2.b,cp2.c,cp2.d,cp2.e,cp2.f].forEach((p,i) => { chemT += Math.round(parseNum(row[i+3]) * (p||0)); });
+                wcDaily[d2] = { water: wc, chem: chemT, total: wc + chemT };
+            });
+        }
+
+        // 전력비 월별 일할
+        let elecCostDaily = 0;
+        const plannedElec = typeof calcElecCostMonthly === 'function' ? calcElecCostMonthly({ source:'planned', simResults: c.simResults }) : null;
+        if (plannedElec?.[_cvCurrentMonth]) elecCostDaily = Math.round((plannedElec[_cvCurrentMonth].total || 0) / (days.length || 1));
+
+        let html = '<table class="pv-tbl cd-daily"><thead>';
+        html += '<tr class="cd-grp"><th class="cd-fix-day">&nbsp;</th><th class="cd-fix-dow">&nbsp;</th>';
+        html += '<th colspan="6" style="color:#67e8f9">CHP</th>';
+        html += '<th colspan="4" style="color:#6ee7b7">PLB</th>';
+        html += '<th colspan="4" style="color:#60a5fa">전력</th>';
+        html += '<th colspan="3" style="color:#f59e0b">기타비용</th>';
+        html += '<th>&nbsp;</th></tr>';
+        html += '<tr class="cd-sub"><th class="cd-fix-day">일</th><th class="cd-fix-dow">요일</th>';
+        html += `<th>수량<br><span style="color:#475569">(Nm³)</span></th><th>단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
+        html += `<th>가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>기동비<br><span style="color:#475569">(만원)</span></th><th>열량<br><span style="color:#475569">(Gcal)</span></th>`;
+        html += `<th>수량<br><span style="color:#475569">(Nm³)</span></th><th>단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
+        html += `<th>가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>발전<br><span style="color:#475569">(MWh)</span></th><th>판매액<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th><th>CP<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>전력비<br><span style="color:#475569">(만원)</span></th><th>용수비<br><span style="color:#475569">(만원)</span></th><th>약품비<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="font-weight:700">순비용<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>`;
+
+        const sums = { chpNg:0, chpFuel:0, calcChp:0, startup:0, chpHeat:0, plbNg:0, plbFuel:0, calcPlb:0, elecMWh:0, elecRev:0, calcElec:0, cp:0, net:0 };
+        days.forEach(r => {
+            const chpCalc = Math.round((r.chpNg||0) * (r.ngCostNm3||0));
+            const plbCalc = Math.round((r.plbNg||0) * (r.ngPLBNm3||0));
+            let elecCalc = 0;
+            if (r.hourly) r.hourly.forEach(hr => { if (hr.chpPowerKWh > 0) elecCalc += (hr.mp||0) * hr.chpPowerKWh; });
+            elecCalc = Math.round(elecCalc);
+            const dayCP = (r.isWeekend || r.isHoliday) ? cpHol : cpWd;
+            const wc = wcDaily[r.day] || { water:0, chem:0, total:0 };
+            const net = (r.chpFuelCost||0) + (r.startupCost||0) + (r.plbFuelCost||0) + elecCostDaily + wc.total - (r.chpElecRev||0) - dayCP;
+            sums.chpNg += r.chpNg||0; sums.chpFuel += r.chpFuelCost||0; sums.calcChp += chpCalc;
+            sums.startup += r.startupCost||0; sums.chpHeat += r.chpHeat||0;
+            sums.plbNg += r.plbNg||0; sums.plbFuel += r.plbFuelCost||0; sums.calcPlb += plbCalc;
+            sums.elecMWh += r.chpPower||0; sums.elecRev += r.chpElecRev||0; sums.calcElec += elecCalc;
+            sums.cp += dayCP; sums.elecCost = (sums.elecCost||0) + elecCostDaily;
+            sums.water = (sums.water||0) + wc.water; sums.chem = (sums.chem||0) + wc.chem;
+            sums.net += net;
+
+            const dowColor = r.isWeekend||r.isHoliday ? '#f87171' : r.isMaint ? '#a78bfa' : '#94a3b8';
+            const nc = net > 0 ? '#f87171' : net < 0 ? '#4ade80' : '#64748b';
+            html += `<tr><td class="cd-fix-day" style="font-weight:600;color:#e2e8f0">${r.day}</td>`;
+            html += `<td class="cd-fix-dow" style="color:${dowColor}">${r.dowName}</td>`;
+            html += `<td style="${R};color:${C}">${fmtN(r.chpNg)}</td><td style="${R};color:${C}">${fmtN(r.ngCostNm3)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(r.chpFuelCost)}</td><td style="${V}">${r.chpNg > 0 ? chk(chpCalc, r.chpFuelCost||0) : '-'}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(r.startupCost)}</td><td style="${R};color:${C}">${fmtQ(r.chpHeat)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtN(r.plbNg)}</td><td style="${R};color:${C}">${fmtN(r.ngPLBNm3)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(r.plbFuelCost)}</td><td style="${V}">${r.plbNg > 0 ? chk(plbCalc, r.plbFuelCost||0) : '-'}</td>`;
+            html += `<td style="${R};color:${C}">${r.chpPower > 0 ? r.chpPower.toFixed(1) : '-'}</td>`;
+            html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(r.chpElecRev)}</td>`;
+            html += `<td style="${V}">${r.chpPower > 0 ? chk(elecCalc, r.chpElecRev||0) : '-'}</td>`;
+            html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(dayCP)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(elecCostDaily)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(wc.water)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(wc.chem)}</td>`;
+            html += `<td style="${R};font-weight:700;color:${nc}">${fmtW(net)}</td></tr>`;
+        });
+        const snc = sums.net > 0 ? '#f87171' : '#4ade80';
+        html += `<tr class="cd-sum" style="font-weight:700;border-top:2px solid #334155"><td class="cd-fix-day" style="color:#e2e8f0" colspan="2">합계</td>`;
+        html += `<td style="${R};color:${C}">${fmtN(sums.chpNg)}</td><td style="${R}">-</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.chpFuel)}</td><td style="${V}">${chk(sums.calcChp, sums.chpFuel)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.startup)}</td><td style="${R};color:${C}">${fmtQ(sums.chpHeat)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtN(sums.plbNg)}</td><td style="${R}">-</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.plbFuel)}</td><td style="${V}">${chk(sums.calcPlb, sums.plbFuel)}</td>`;
+        html += `<td style="${R};color:${C}">${sums.elecMWh.toFixed(1)}</td>`;
+        html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(sums.elecRev)}</td><td style="${V}">${chk(sums.calcElec, sums.elecRev)}</td>`;
+        html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(sums.cp)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.elecCost||0)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.water||0)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.chem||0)}</td>`;
+        html += `<td style="${R};font-weight:800;color:${snc}">${fmtW(sums.net)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+        _setupAutoScroll(el);
+    }
+}
+
+// ══════════════════════════════════════
+//  외부수열 탭
+// ══════════════════════════════════════
+function _cvRenderExt() {
+    const el = document.getElementById('pv_cv_ext');
+    if (!el || !_cvCache) return;
+    const c = _cvCache;
+    const { fmtW, fmtN, fmtQ, C, R, V, chk } = _cvFmt();
+    const extHeat = c.extHeat;
+    if (!extHeat) { el.innerHTML = '<p class="hint">외부수열 데이터가 없습니다</p>'; return; }
+    const srcNames = extHeat.sourceNames;
+
+    if (_cvCurrentView === 'monthly') {
+        let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
+        html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
+        srcNames.forEach(n => {
+            const short = n.length > 6 ? n.slice(0,6)+'..' : n;
+            html += `<th title="${n}">${short}<br><span style="color:#475569">(Gcal)</span></th>`;
+            html += `<th>비용<br><span style="color:#475569">(만원)</span></th>`;
+        });
+        html += `<th style="font-weight:700;color:#f87171">소계<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>`;
+        const tot = {}; srcNames.forEach(n => tot[n] = { qty:0, cost:0 }); let totAll = 0;
+        for (let m = 1; m <= 12; m++) {
+            html += `<tr><td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${m}월</td>`;
+            let rowTotal = 0;
+            srcNames.forEach(n => {
+                const q = extHeat.qty[m]?.[n] || 0, co = extHeat.cost[m]?.[n] || 0;
+                tot[n].qty += q; tot[n].cost += co; rowTotal += co;
+                html += `<td style="${R};color:${C}">${fmtQ(q)}</td><td style="${R};color:${C}">${fmtW(co)}</td>`;
+            });
+            totAll += rowTotal;
+            html += `<td style="${R};font-weight:700;color:#f87171">${fmtW(rowTotal)}</td></tr>`;
+        }
+        html += `<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b"><td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>`;
+        srcNames.forEach(n => { html += `<td style="${R};color:${C}">${fmtQ(tot[n].qty)}</td><td style="${R};color:${C}">${fmtW(tot[n].cost)}</td>`; });
+        html += `<td style="${R};font-weight:800;color:#f87171">${fmtW(totAll)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+    } else {
+        // 일별
+        const days = c.simResults.filter(r => r.month === _cvCurrentMonth);
+        // 외부열원 일별 데이터
+        const extDaily = {};
+        if (DATA.operations_daily && DATA.sale_prices_daily) {
+            const oH = DATA.operations_daily.headers, pH = DATA.sale_prices_daily.headers;
+            const sources = srcNames.map(name => ({ name, opsCol: oH.indexOf(name), priceCol: pH.indexOf(EXT_SOURCES.find(s=>s.opsName===name)?.priceName||name) }));
+            const priceMap = {};
+            DATA.sale_prices_daily.rows.forEach(row => { const key = `${Number(row[0])}-${Number(row[1])}`; priceMap[key] = {}; sources.forEach(s => { if (s.priceCol>=0) priceMap[key][s.name] = parseNum(row[s.priceCol]); }); });
+            DATA.operations_daily.rows.forEach(row => {
+                const m = Number(row[0]), d = Number(row[1]); if (m !== _cvCurrentMonth) return;
+                const prices = priceMap[`${m}-${d}`] || {}; extDaily[d] = { _total:0 };
+                sources.forEach(s => { const q = parseNum(row[s.opsCol]), p = prices[s.name]||0; extDaily[d][s.name] = { qty:q, price:p, cost:Math.round(q*p) }; extDaily[d]._total += extDaily[d][s.name].cost; });
+            });
+        }
+        const activeSrc = srcNames.filter(n => days.some(d => extDaily[d.day]?.[n]?.qty > 0));
+
+        let html = '<table class="pv-tbl cd-daily"><thead>';
+        html += '<tr class="cd-grp"><th class="cd-fix-day">&nbsp;</th><th class="cd-fix-dow">&nbsp;</th>';
+        activeSrc.forEach(n => { const s = n.length>5 ? n.slice(0,5)+'..' : n; html += `<th colspan="4" title="${n}" style="color:#f59e0b">${s}</th>`; });
+        html += `<th>&nbsp;</th></tr>`;
+        html += '<tr class="cd-sub"><th class="cd-fix-day">일</th><th class="cd-fix-dow">요일</th>';
+        activeSrc.forEach(() => {
+            html += `<th>수량<br><span style="color:#475569">(Gcal)</span></th><th>단가<br><span style="color:#475569">(원)</span></th>`;
+            html += `<th>비용<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        });
+        html += `<th style="font-weight:700;color:#f87171">소계<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>`;
+
+        const extSums = {}; activeSrc.forEach(n => extSums[n] = { qty:0, cost:0 }); let sumTotal = 0;
+        days.forEach(r => {
+            const ed = extDaily[r.day] || {};
+            const dowColor = r.isWeekend||r.isHoliday ? '#f87171' : '#94a3b8';
+            html += `<tr><td class="cd-fix-day" style="font-weight:600;color:#e2e8f0">${r.day}</td>`;
+            html += `<td class="cd-fix-dow" style="color:${dowColor}">${r.dowName}</td>`;
+            let rowTotal = 0;
+            activeSrc.forEach(n => {
+                const e = ed[n] || { qty:0, price:0, cost:0 };
+                extSums[n].qty += e.qty; extSums[n].cost += e.cost; rowTotal += e.cost;
+                const ec = Math.round(e.qty * e.price);
+                html += `<td style="${R};color:${C}">${fmtQ(e.qty)}</td><td style="${R};color:${C}">${e.qty>0?fmtN(e.price):'-'}</td>`;
+                html += `<td style="${R};color:${C}">${fmtW(e.cost)}</td><td style="${V}">${e.qty>0?chk(ec,e.cost):'-'}</td>`;
+            });
+            sumTotal += rowTotal;
+            html += `<td style="${R};font-weight:700;color:#f87171">${fmtW(rowTotal)}</td></tr>`;
+        });
+        html += `<tr class="cd-sum" style="font-weight:700;border-top:2px solid #334155"><td class="cd-fix-day" style="color:#e2e8f0" colspan="2">합계</td>`;
+        activeSrc.forEach(n => { html += `<td style="${R};color:${C}">${fmtQ(extSums[n].qty)}</td><td style="${R}">-</td><td style="${R};color:${C}">${fmtW(extSums[n].cost)}</td><td style="${V}"><span style="color:#4ade80">\u2713</span></td>`; });
+        html += `<td style="${R};font-weight:800;color:#f87171">${fmtW(sumTotal)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+        _setupAutoScroll(el);
+    }
+}
+
+// ══════════════════════════════════════
+//  열판매 수입 탭
+// ══════════════════════════════════════
+function _cvRenderSales() {
+    const el = document.getElementById('pv_cv_sales');
+    if (!el || !_cvCache) return;
+    const c = _cvCache;
+    const { fmtW, fmtN, fmtQ, C, R, V, chk } = _cvFmt();
+
+    const demandCats = ['주택용난방','업무용난방','업무용냉방','공공용난방','공공용(수영장)','공공용냉방'];
+    const baseCats = ['주택용난방','업무용난방','업무용냉방','공공용난방','공공용냉방'];
+    const catShort = { '주택용난방':'주택', '업무용난방':'업무(난)', '업무용냉방':'업무(냉)', '공공용난방':'공공(난)', '공공용(수영장)':'수영장', '공공용냉방':'공공(냉)' };
+    const rateMap = { '주택용난방':'주택용', '업무용난방':'업무용', '업무용냉방':'업무용', '공공용난방':'공공용', '공공용(수영장)':'_swim', '공공용냉방':'공공용' };
+
+    if (_cvCurrentView === 'monthly') {
+        const hs = c.heatSales;
+        if (!hs) { el.innerHTML = '<p class="hint">열판매 데이터가 없습니다</p>'; return; }
+        const itemNames = ['기본료','주택용 판매','업무용 난방','업무용 냉방','공공용 난방','공공용 수영장','공공용 냉방','인테코 판매'];
+        const getVal = (m, n) => {
+            if (n === '기본료') return hs[m]?.baseFee || 0;
+            const map = {'주택용 판매':'주택용','업무용 난방':'업무용난방','업무용 냉방':'업무용냉방','공공용 난방':'공공용난방','공공용 수영장':'공공용수영장','공공용 냉방':'공공용냉방','인테코 판매':'인테코'};
+            return hs[m]?.items?.[map[n]]?.rev || 0;
+        };
+        let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
+        html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
+        itemNames.forEach(n => html += `<th>${n}<br><span style="color:#475569">(만원)</span></th>`);
+        html += `<th style="font-weight:700;color:#60a5fa">소계<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>`;
+        const tots = {}; itemNames.forEach(n => tots[n] = 0); let totAll = 0;
+        for (let m = 1; m <= 12; m++) {
+            html += `<tr><td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${m}월</td>`;
+            let rowT = 0;
+            itemNames.forEach(n => { const v = getVal(m,n); tots[n] += v; rowT += v; html += `<td style="${R};color:${C}">${fmtW(v)}</td>`; });
+            totAll += rowT;
+            html += `<td style="${R};font-weight:700;color:#60a5fa">${fmtW(rowT)}</td></tr>`;
+        }
+        html += `<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b"><td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>`;
+        itemNames.forEach(n => html += `<td style="${R};color:${C}">${fmtW(tots[n])}</td>`);
+        html += `<td style="${R};font-weight:800;color:#60a5fa">${fmtW(totAll)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+    } else {
+        // 일별
+        const days = c.simResults.filter(r => r.month === _cvCurrentMonth);
+        const heatRates = {};
+        let swimRatio = 0;
+        if (DATA.heat_rate_table) {
+            const hrH = DATA.heat_rate_table.headers, srIdx = hrH.indexOf('수영장비율(%)');
+            DATA.heat_rate_table.rows.forEach(row => { if (Number(row[0])===_cvCurrentMonth) { hrH.forEach((h,i) => { if (i>0) heatRates[h]=parseNum(row[i]); }); if (srIdx>=0) swimRatio=parseNum(row[srIdx]); } });
+        }
+        const heatQtyDaily = {};
+        if (DATA.sales_hourly) {
+            const shH = DATA.sales_hourly.headers, colMap = {};
+            baseCats.forEach(cc => colMap[cc] = shH.indexOf(cc));
+            DATA.sales_hourly.rows.forEach(row => {
+                const m=Number(row[0]), d=Number(row[1]); if (m!==_cvCurrentMonth) return;
+                if (!heatQtyDaily[d]) { heatQtyDaily[d] = {}; demandCats.forEach(cc => heatQtyDaily[d][cc]=0); }
+                baseCats.forEach(cc => { if (colMap[cc]>=0) heatQtyDaily[d][cc] += Number(row[colMap[cc]])||0; });
+            });
+            Object.values(heatQtyDaily).forEach(hq => { const t=hq['공공용난방']||0; hq['공공용(수영장)']=t*swimRatio; hq['공공용난방']=t-t*swimRatio; });
+        }
+        const intecoDaily = {}, intecoPriceDaily = {};
+        if (DATA.sales_daily) { const sdH=DATA.sales_daily.headers, ic=sdH.indexOf('인테코'); if (ic>=0) DATA.sales_daily.rows.forEach(row => { if (Number(row[0])===_cvCurrentMonth) intecoDaily[Number(row[1])]={qty:Number(row[ic])||0}; }); }
+        if (DATA.sale_prices_daily) { const prH=DATA.sale_prices_daily.headers, ipC=prH.indexOf('인테코(판매)'); if (ipC>=0) DATA.sale_prices_daily.rows.forEach(row => { if (Number(row[0])===_cvCurrentMonth) intecoPriceDaily[Number(row[1])]=Number(row[ipC])||0; }); }
+        const baseFee = heatRates['기본료']||0;
+
+        let html = '<table class="pv-tbl cd-daily"><thead>';
+        html += '<tr class="cd-grp"><th class="cd-fix-day">&nbsp;</th><th class="cd-fix-dow">&nbsp;</th>';
+        html += '<th>&nbsp;</th>'; // 기본료
+        demandCats.forEach(cc => { html += `<th colspan="4" style="color:#a78bfa">${catShort[cc]}</th>`; });
+        html += '<th colspan="4" style="color:#a78bfa">인테코</th>';
+        html += '<th>&nbsp;</th></tr>';
+        html += '<tr class="cd-sub"><th class="cd-fix-day">일</th><th class="cd-fix-dow">요일</th>';
+        html += `<th>기본료<br><span style="color:#475569">(만원)</span></th>`;
+        demandCats.forEach(() => {
+            html += `<th>수량<br><span style="color:#475569">(Gcal)</span></th><th>단가<br><span style="color:#475569">(원)</span></th>`;
+            html += `<th>수입<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        });
+        html += `<th>수량<br><span style="color:#475569">(Gcal)</span></th><th>단가<br><span style="color:#475569">(원)</span></th>`;
+        html += `<th>수입<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="font-weight:700;color:#60a5fa">소계<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>`;
+
+        const catSums = {}; demandCats.forEach(cc => catSums[cc]={qty:0,rev:0}); let sumIntQ=0, sumIntRev=0, sumBaseFee=0, sumTotal=0;
+        days.forEach(r => {
+            const hq = heatQtyDaily[r.day]||{};
+            const dowColor = r.isWeekend||r.isHoliday ? '#f87171' : '#94a3b8';
+            html += `<tr><td class="cd-fix-day" style="font-weight:600;color:#e2e8f0">${r.day}</td>`;
+            html += `<td class="cd-fix-dow" style="color:${dowColor}">${r.dowName}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(baseFee)}</td>`;
+            sumBaseFee += baseFee;
+            let rowRev = baseFee;
+            demandCats.forEach(cc => {
+                const qty = hq[cc]||0;
+                const rk = rateMap[cc];
+                const price = rk === '_swim' ? Math.round((heatRates['공공용']||0)*0.5) : (heatRates[rk]||0);
+                const rev = Math.round(qty * price);
+                catSums[cc].qty += qty; catSums[cc].rev += rev; rowRev += rev;
+                html += `<td style="${R};color:${C}">${fmtQ(qty)}</td><td style="${R};color:${C}">${qty>0?fmtN(price):'-'}</td>`;
+                html += `<td style="${R};color:${C}">${fmtW(rev)}</td><td style="${V}">${qty>0?chk(Math.round(qty*price),rev):'-'}</td>`;
+            });
+            const iQ = intecoDaily[r.day]?.qty||0, iP = intecoPriceDaily[r.day]||0, iR = Math.round(iQ*iP);
+            sumIntQ += iQ; sumIntRev += iR; rowRev += iR;
+            html += `<td style="${R};color:${C}">${fmtQ(iQ)}</td><td style="${R};color:${C}">${iQ>0?fmtN(iP):'-'}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(iR)}</td><td style="${V}">${iQ>0?chk(Math.round(iQ*iP),iR):'-'}</td>`;
+            sumTotal += rowRev;
+            html += `<td style="${R};font-weight:700;color:#60a5fa">${fmtW(rowRev)}</td></tr>`;
+        });
+        html += `<tr class="cd-sum" style="font-weight:700;border-top:2px solid #334155"><td class="cd-fix-day" style="color:#e2e8f0" colspan="2">합계</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sumBaseFee)}</td>`;
+        demandCats.forEach(cc => { html += `<td style="${R};color:${C}">${fmtQ(catSums[cc].qty)}</td><td style="${R}">-</td><td style="${R};color:${C}">${fmtW(catSums[cc].rev)}</td><td style="${V}"><span style="color:#4ade80">\u2713</span></td>`; });
+        html += `<td style="${R};color:${C}">${fmtQ(sumIntQ)}</td><td style="${R}">-</td><td style="${R};color:${C}">${fmtW(sumIntRev)}</td><td style="${V}"><span style="color:#4ade80">\u2713</span></td>`;
+        html += `<td style="${R};font-weight:800;color:#60a5fa">${fmtW(sumTotal)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+        _setupAutoScroll(el);
+    }
+}
+
+// ══════════════════════════════════════
+//  종합 손익 탭
+// ══════════════════════════════════════
+function _cvRenderSummary() {
+    const el = document.getElementById('pv_cv_summary');
+    if (!el || !_cvCache) return;
+    const c = _cvCache;
+    const { fmtW, C, R } = _cvFmt();
+    const hs = c.heatSales;
+    const ext = c.extHeat;
+
+    let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
+    html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
+    html += `<th style="color:#60a5fa">열판매수입<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#60a5fa">전력판매<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#60a5fa">CP<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#60a5fa;font-weight:700">수입합계<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#f87171">자체열원비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#f87171">외부수열비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#f87171;font-weight:700">지출합계<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="font-weight:800">공헌이익<br><span style="color:#475569">(만원)</span></th>`;
+    html += '</tr></thead><tbody>';
+    const tot = { sales:0, elec:0, cp:0, revT:0, self:0, ext:0, costT:0, profit:0 };
+    for (let m = 1; m <= 12; m++) {
+        const b = c.monthly[m-1];
+        const sales = hs ? hs[m]?.total || 0 : 0;
+        const elec = b.chpElecRev;
+        const cp = b.cpCharge;
+        const revT = sales + elec + cp;
+        const selfCost = b.chpFuelCost + b.startupCost + b.plbFuelCost;
+        const extCost = ext ? ext.cost[m]?._total || 0 : 0;
+        const costT = selfCost + extCost;
+        const profit = revT - costT;
+        tot.sales += sales; tot.elec += elec; tot.cp += cp; tot.revT += revT;
+        tot.self += selfCost; tot.ext += extCost; tot.costT += costT; tot.profit += profit;
+        const pc = profit >= 0 ? '#4ade80' : '#f87171';
+        html += `<tr><td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${m}월</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sales)}</td><td style="${R};color:${C}">${fmtW(elec)}</td><td style="${R};color:${C}">${fmtW(cp)}</td>`;
+        html += `<td style="${R};font-weight:700;color:#60a5fa">${fmtW(revT)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(selfCost)}</td><td style="${R};color:${C}">${fmtW(extCost)}</td>`;
+        html += `<td style="${R};font-weight:700;color:#f87171">${fmtW(costT)}</td>`;
+        html += `<td style="${R};font-weight:700;color:${pc}">${fmtW(profit)}</td></tr>`;
+    }
+    const tpc = tot.profit >= 0 ? '#4ade80' : '#f87171';
+    html += `<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b"><td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>`;
+    html += `<td style="${R};color:${C}">${fmtW(tot.sales)}</td><td style="${R};color:${C}">${fmtW(tot.elec)}</td><td style="${R};color:${C}">${fmtW(tot.cp)}</td>`;
+    html += `<td style="${R};font-weight:800;color:#60a5fa">${fmtW(tot.revT)}</td>`;
+    html += `<td style="${R};color:${C}">${fmtW(tot.self)}</td><td style="${R};color:${C}">${fmtW(tot.ext)}</td>`;
+    html += `<td style="${R};font-weight:800;color:#f87171">${fmtW(tot.costT)}</td>`;
+    html += `<td style="${R};font-weight:800;color:${tpc}">${fmtW(tot.profit)}</td></tr>`;
+    html += '</tbody></table><div style="height:40px"></div>';
+    el.innerHTML = html;
+}
+
+// ─── costTabs 탭 전환 시 현재 탭 기억 ───
+// (기존 탭 전환 리스너가 costTabs를 처리하므로, 추가로 _cvCurrentTab 업데이트)
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        document.querySelectorAll('#costTabs .inner-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                _cvCurrentTab = btn.dataset.costtab;
+                _cvRenderControls();
+                _cvRenderCurrentTab();
+            });
+        });
+    }, 100);
+});
+
+// ─── 비용 상세 탭 렌더링 (하위호환 — 기존 호출 유지) ───
+let _costDetailCache = null;
+function renderCostDetail(simResults) {
+    const el = document.getElementById('pv_plan_cost_detail');
+    const fixedEl = document.getElementById('cdFixedControls');
+    if (!el) return;
+    if (!simResults || !simResults.length) {
+        el.innerHTML = '<p class="hint">기동계획 실행 후 표시됩니다</p>';
+        if (fixedEl) fixedEl.innerHTML = '';
+        return;
+    }
+
+    // 데이터 캐시
+    _costDetailCache = { simResults, monthly: aggregateMonthly(simResults), heatSales: calcHeatSalesMonthlyDetail(), extHeat: calcExternalHeatMonthlyDetail() };
+
+    // 고정 영역: 월별/일별 탭 + 월 선택 버튼
+    if (fixedEl) {
+        let ctrl = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+        ctrl += '<button class="cd-tab active" data-cdview="daily" onclick="_switchCostDetailView(\'daily\')">일별</button>';
+        ctrl += '<button class="cd-tab" data-cdview="monthly" onclick="_switchCostDetailView(\'monthly\')">월별</button>';
+        ctrl += '<span style="width:1px;height:20px;background:#334155;margin:0 4px"></span>';
+        ctrl += '<span id="cdMonthBtns"></span>';
+        ctrl += '</div>';
+        fixedEl.innerHTML = ctrl;
+    }
+
+    // 스크롤 영역: 테이블만
+    el.innerHTML = '<div id="cdDailyView"></div><div id="cdMonthlyView" style="display:none"></div>';
+
+    // 탭 스타일 주입
+    if (!document.getElementById('cd-tab-style')) {
+        const st = document.createElement('style');
+        st.id = 'cd-tab-style';
+        st.textContent = `.cd-tab{padding:5px 14px;border:1px solid #334155;border-radius:8px;background:transparent;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}.cd-tab:hover{background:rgba(51,65,85,0.4);color:#e2e8f0}.cd-tab.active{background:rgba(59,130,246,0.2);border-color:rgba(59,130,246,0.5);color:#93c5fd}.cd-month-btn{padding:3px 9px;border:1px solid #475569;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;background:#1e293b;color:#94a3b8;transition:all .15s}.cd-month-btn:hover{background:#334155;color:#e2e8f0}.cd-month-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}`;
+        document.head.appendChild(st);
+    }
+
+    _renderCostDetailDaily(1);
+
+    // 마우스 끝 자동 스크롤 + 일반 휠로 좌우 스크롤
+    _setupAutoScroll(el);
+}
+
+function _setupAutoScroll(container) {
+    // pv-body가 스크롤 컨테이너
+    const scroller = container.closest('.pv-body') || container;
+    let autoScrollRAF = null;
+
+    // 1) 마우스 좌우 끝 자동 스크롤 (좌우 50px 영역)
+    scroller.addEventListener('mousemove', e => {
+        const rect = scroller.getBoundingClientRect();
+        const edgeSize = 50;
+        const leftEdge = e.clientX - rect.left;
+        const rightEdge = rect.right - e.clientX;
+        const topEdge = e.clientY - rect.top;
+        const bottomEdge = rect.bottom - e.clientY;
+
+        if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
+
+        let dx = 0, dy = 0;
+        if (leftEdge < edgeSize && scroller.scrollLeft > 0) dx = -Math.max(2, (edgeSize - leftEdge) * 0.3);
+        else if (rightEdge < edgeSize) dx = Math.max(2, (edgeSize - rightEdge) * 0.3);
+        if (topEdge < edgeSize && scroller.scrollTop > 0) dy = -Math.max(2, (edgeSize - topEdge) * 0.3);
+        else if (bottomEdge < edgeSize) dy = Math.max(2, (edgeSize - bottomEdge) * 0.3);
+
+        if (dx !== 0 || dy !== 0) {
+            function scroll() {
+                scroller.scrollLeft += dx;
+                scroller.scrollTop += dy;
+                autoScrollRAF = requestAnimationFrame(scroll);
+            }
+            autoScrollRAF = requestAnimationFrame(scroll);
+        }
+    });
+
+    scroller.addEventListener('mouseleave', () => {
+        if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
+    });
+
+    // 2) 일반 휠(세로)을 가로 스크롤로 변환 (Shift 없이도)
+    scroller.addEventListener('wheel', e => {
+        // 세로 스크롤 여유가 없으면 가로로 변환
+        const hasVerticalScroll = scroller.scrollHeight > scroller.clientHeight;
+        const atTop = scroller.scrollTop <= 0;
+        const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+        const scrollingDown = e.deltaY > 0;
+        const scrollingUp = e.deltaY < 0;
+
+        // Shift+휠은 항상 가로
+        if (e.shiftKey) {
+            e.preventDefault();
+            scroller.scrollLeft += e.deltaY;
+            return;
+        }
+
+        // 세로 끝에 도달하면 가로로 전환
+        if ((scrollingDown && atBottom) || (scrollingUp && atTop)) {
+            if (scroller.scrollWidth > scroller.clientWidth) {
+                e.preventDefault();
+                scroller.scrollLeft += e.deltaY;
+            }
+        }
+    }, { passive: false });
+}
+
+function _switchCostDetailView(view) {
+    document.querySelectorAll('.cd-tab').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.cd-tab[data-cdview="${view}"]`)?.classList.add('active');
+    document.getElementById('cdMonthlyView').style.display = view === 'monthly' ? '' : 'none';
+    document.getElementById('cdDailyView').style.display = view === 'daily' ? '' : 'none';
+    // 월 선택 버튼: 일별에서만 표시
+    const sep = document.getElementById('cdFixedControls')?.querySelector('span[style*="width:1px"]');
+    const mbtns = document.getElementById('cdMonthBtns');
+    if (sep) sep.style.display = view === 'daily' ? '' : 'none';
+    if (mbtns) mbtns.style.display = view === 'daily' ? '' : 'none';
+    if (view === 'daily') _renderCostDetailDaily(1);
+    if (view === 'monthly') _renderCostDetailMonthly();
+}
+
+function _cdGetItems() {
+    const c = _costDetailCache;
+    if (!c) return { revItems: [], costItems: [] };
+    const revItems = [
+        { name: '기본료', getMonthVal: m => c.heatSales?.[m]?.baseFee || 0 },
+        { name: '주택용 판매', getMonthVal: m => c.heatSales?.[m]?.items?.['주택용']?.rev || 0 },
+        { name: '업무용 난방', getMonthVal: m => c.heatSales?.[m]?.items?.['업무용난방']?.rev || 0 },
+        { name: '업무용 냉방', getMonthVal: m => c.heatSales?.[m]?.items?.['업무용냉방']?.rev || 0 },
+        { name: '공공용 난방', getMonthVal: m => c.heatSales?.[m]?.items?.['공공용난방']?.rev || 0 },
+        { name: '공공용 냉방', getMonthVal: m => c.heatSales?.[m]?.items?.['공공용냉방']?.rev || 0 },
+        { name: '공공용 수영장', getMonthVal: m => c.heatSales?.[m]?.items?.['공공용수영장']?.rev || 0 },
+        { name: '인테코 판매', getMonthVal: m => c.heatSales?.[m]?.items?.['인테코']?.rev || 0 },
+        { name: '전력판매(열제약)', getMonthVal: m => c.monthly[m - 1].chpElecRev || 0 },
+        { name: '용량요금(CP)', getMonthVal: m => c.monthly[m - 1].cpCharge || 0 },
+    ];
+    const costItems = [
+        { name: 'CHP 가스비', getMonthVal: m => c.monthly[m - 1].chpFuelCost || 0 },
+        { name: 'CHP 기동비', getMonthVal: m => c.monthly[m - 1].startupCost || 0 },
+        { name: 'PLB 가스비', getMonthVal: m => c.monthly[m - 1].plbFuelCost || 0 },
+    ];
+    if (c.extHeat) {
+        c.extHeat.sourceNames.forEach(name => {
+            costItems.push({ name, getMonthVal: m => c.extHeat.cost[m]?.[name] || 0 });
+        });
+    }
+    return { revItems, costItems };
+}
+
+function _renderCostDetailMonthly() {
+    const el = document.getElementById('cdMonthlyView');
+    if (!el || !_costDetailCache) return;
+    const c = _costDetailCache;
+    const { revItems, costItems } = _cdGetItems();
+    const div = 10000;
+    const fmt = v => Math.round(v / div).toLocaleString();
+    const chk = (calc, sim) => {
+        const diff = calc - sim;
+        const absDiff = Math.abs(diff);
+        if (absDiff <= 100) return '<span style="color:#4ade80">✓</span>';
+        const diffW = Math.round(diff / 10000);
+        if (diffW === 0) return '<span style="color:#a3e635">≈</span>';
+        const sign = diffW > 0 ? '+' : '';
+        const color = diffW > 0 ? '#f87171' : '#60a5fa';
+        return `<span style="color:${color}">(${sign}${diffW.toLocaleString()})</span>`;
+    };
+
+    // ── 월별 검증 데이터 계산 (일별 시뮬 합산) ──
+    const simMonthly = Array.from({ length: 12 }, () => ({ chpFuelCalc: 0, chpFuelSim: 0, plbFuelCalc: 0, plbFuelSim: 0, elecCalc: 0, elecSim: 0 }));
+    c.simResults.forEach(r => {
+        const b = simMonthly[r.month - 1];
+        b.chpFuelCalc += Math.round((r.chpNg || 0) * (r.ngCostNm3 || 0));
+        b.chpFuelSim += r.chpFuelCost || 0;
+        b.plbFuelCalc += Math.round((r.plbNg || 0) * (r.ngPLBNm3 || 0));
+        b.plbFuelSim += r.plbFuelCost || 0;
+        let eCalc = 0;
+        if (r.hourly) r.hourly.forEach(hr => { if (hr.chpPowerKWh > 0) eCalc += (hr.mp || 0) * hr.chpPowerKWh; });
+        b.elecCalc += Math.round(eCalc);
+        b.elecSim += r.chpElecRev || 0;
+    });
+
+    const allRevCols = revItems.map(it => it.name);
+    const allCostCols = costItems.map(it => it.name);
+
+    // 월별 데이터 사전 계산
+    const data = [];
+    for (let m = 1; m <= 12; m++) {
+        const row = { month: m, rev: {}, cost: {}, revTotal: 0, costTotal: 0 };
+        revItems.forEach(it => { const v = it.getMonthVal(m); row.rev[it.name] = v; row.revTotal += v; });
+        costItems.forEach(it => { const v = it.getMonthVal(m); row.cost[it.name] = v; row.costTotal += v; });
+        row.profit = row.revTotal - row.costTotal;
+        row.sim = simMonthly[m - 1];
+        data.push(row);
+    }
+    const totals = { rev: {}, cost: {}, revTotal: 0, costTotal: 0, sim: { chpFuelCalc: 0, chpFuelSim: 0, plbFuelCalc: 0, plbFuelSim: 0, elecCalc: 0, elecSim: 0 } };
+    allRevCols.forEach(n => totals.rev[n] = data.reduce((s, r) => s + r.rev[n], 0));
+    allCostCols.forEach(n => totals.cost[n] = data.reduce((s, r) => s + r.cost[n], 0));
+    totals.revTotal = data.reduce((s, r) => s + r.revTotal, 0);
+    totals.costTotal = data.reduce((s, r) => s + r.costTotal, 0);
+    totals.profit = totals.revTotal - totals.costTotal;
+    simMonthly.forEach(s => { Object.keys(s).forEach(k => totals.sim[k] += s[k]); });
+
+    // 검증 대상 항목 매핑
+    const verifyMap = {
+        'CHP 가스비': r => chk(r.sim.chpFuelCalc, r.sim.chpFuelSim),
+        'PLB 가스비': r => chk(r.sim.plbFuelCalc, r.sim.plbFuelSim),
+        '전력판매(열제약)': r => chk(r.sim.elecCalc, r.sim.elecSim),
+    };
+
+    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    html += '<span style="font-size:13px;font-weight:700;color:#e2e8f0">월별 수입/지출 상세</span>';
+    html += '<span style="font-size:11px;color:#64748b">단위: 만원</span></div>';
+
+    // 공통 빌더
+    function buildTable(title, titleBg, titleColor, cols, getRowVal, getTotalVal, subtotalLabel) {
+        // 검증 있는 항목 확인
+        const hasVerify = cols.some(n => verifyMap[n]);
+        let t = `<div style="margin-bottom:16px"><div style="background:${titleBg};color:${titleColor};font-weight:700;font-size:12px;padding:6px 10px;border-radius:8px 8px 0 0">▼ ${title}</div>`;
+        t += '<div style="overflow-x:auto"><table class="pv-tbl" style="font-size:11px;white-space:nowrap;border-top:none">';
+        t += '<thead><tr><th style="position:sticky;left:0;background:#0f172a;z-index:2;min-width:40px">월</th>';
+        cols.forEach(n => {
+            t += `<th style="color:#94a3b8;font-weight:500">${n}<br><span style="color:#475569;font-size:9px">(만원)</span></th>`;
+            if (verifyMap[n]) t += '<th style="color:#4ade80;font-weight:500">검증<br><span style="color:#475569;font-size:9px">(만원)</span></th>';
+        });
+        t += `<th style="color:${titleColor};font-weight:700">${subtotalLabel}<br><span style="color:#475569;font-size:9px">(만원)</span></th></tr></thead><tbody>`;
+        data.forEach(r => {
+            t += '<tr>';
+            t += `<td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${r.month}월</td>`;
+            cols.forEach(n => {
+                t += `<td style="text-align:right;color:#cbd5e1">${fmt(getRowVal(r, n))}</td>`;
+                if (verifyMap[n]) t += `<td style="text-align:center">${verifyMap[n](r)}</td>`;
+            });
+            const sub = cols.reduce((s, n) => s + getRowVal(r, n), 0);
+            t += `<td style="text-align:right;font-weight:600;color:${titleColor}">${fmt(sub)}</td>`;
+            t += '</tr>';
+        });
+        // 합계
+        t += '<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b">';
+        t += '<td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>';
+        cols.forEach(n => {
+            t += `<td style="text-align:right;color:${titleColor}80">${fmt(getTotalVal(n))}</td>`;
+            if (verifyMap[n]) t += `<td style="text-align:center">${verifyMap[n](totals)}</td>`;
+        });
+        const grandSub = cols.reduce((s, n) => s + getTotalVal(n), 0);
+        t += `<td style="text-align:right;color:${titleColor};font-weight:800">${fmt(grandSub)}</td>`;
+        t += '</tr></tbody></table></div></div>';
+        return t;
+    }
+
+    // 수입 테이블
+    html += buildTable('수 입', '#0f2942', '#60a5fa', allRevCols,
+        (r, n) => r.rev[n], n => totals.rev[n], '수입 소계');
+
+    // 지출 테이블
+    html += buildTable('지 출', '#2d1215', '#f87171', allCostCols,
+        (r, n) => r.cost[n], n => totals.cost[n], '지출 소계');
+
+    // 공헌이익 요약
+    html += '<div style="overflow-x:auto"><table class="pv-tbl" style="font-size:11px;white-space:nowrap">';
+    html += '<thead><tr><th style="position:sticky;left:0;background:#0f172a;z-index:2;min-width:40px">월</th>';
+    html += '<th style="text-align:right;color:#60a5fa">수입<br><span style="color:#475569;font-size:9px">(만원)</span></th>';
+    html += '<th style="text-align:right;color:#f87171">지출<br><span style="color:#475569;font-size:9px">(만원)</span></th>';
+    html += '<th style="text-align:right;font-weight:800">공헌이익<br><span style="color:#475569;font-size:9px">(만원)</span></th></tr></thead><tbody>';
+    data.forEach(r => {
+        const pc = r.profit >= 0 ? '#4ade80' : '#f87171';
+        html += '<tr>';
+        html += `<td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${r.month}월</td>`;
+        html += `<td style="text-align:right;color:#60a5fa">${fmt(r.revTotal)}</td>`;
+        html += `<td style="text-align:right;color:#f87171">${fmt(r.costTotal)}</td>`;
+        html += `<td style="text-align:right;font-weight:700;color:${pc}">${fmt(r.profit)}</td>`;
+        html += '</tr>';
+    });
+    const tpc = totals.profit >= 0 ? '#4ade80' : '#f87171';
+    html += '<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b">';
+    html += '<td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>';
+    html += `<td style="text-align:right;color:#60a5fa">${fmt(totals.revTotal)}</td>`;
+    html += `<td style="text-align:right;color:#f87171">${fmt(totals.costTotal)}</td>`;
+    html += `<td style="text-align:right;font-weight:800;color:${tpc}">${fmt(totals.profit)}</td>`;
+    html += '</tr></tbody></table></div>';
+    html += '<div style="height:40px"></div>';
+
+    el.innerHTML = html;
+}
+
+function _renderCostDetailDaily(selMonth) {
+    const el = document.getElementById('cdDailyView');
+    if (!el || !_costDetailCache) return;
+    const c = _costDetailCache;
+    const days = c.simResults.filter(r => r.month === selMonth);
+    const BG = '#0f172a';
+
+    // 월 선택 버튼 → 고정 영역에 렌더링
+    const monthBtnsEl = document.getElementById('cdMonthBtns');
+    if (monthBtnsEl) {
+        let mb = '';
+        for (let m = 1; m <= 12; m++) {
+            const active = m === selMonth ? ' active' : '';
+            mb += `<button class="cd-month-btn${active}" onclick="_renderCostDetailDaily(${m})">${m}월</button> `;
+        }
+        monthBtnsEl.innerHTML = mb;
+    }
+    let html = '';
+
+    // ── 외부열원별 일별 데이터 준비 ──
+    const extHeat = c.extHeat;
+    const extDaily = {};
+    const extSrcNames = extHeat?.sourceNames || [];
+    if (extHeat && DATA.operations_daily && DATA.sale_prices_daily) {
+        const oH = DATA.operations_daily.headers;
+        const pH = DATA.sale_prices_daily.headers;
+        const sources = extSrcNames.map(name => ({
+            name, opsCol: oH.indexOf(name),
+            priceCol: pH.indexOf(EXT_SOURCES.find(s => s.opsName === name)?.priceName || name)
+        }));
+        const priceMap = {};
+        DATA.sale_prices_daily.rows.forEach(row => {
+            const key = `${Number(row[0])}-${Number(row[1])}`;
+            priceMap[key] = {};
+            sources.forEach(s => { if (s.priceCol >= 0) priceMap[key][s.name] = parseNum(row[s.priceCol]); });
+        });
+        DATA.operations_daily.rows.forEach(row => {
+            const m = Number(row[0]), d = Number(row[1]);
+            if (m !== selMonth) return;
+            const prices = priceMap[`${m}-${d}`] || {};
+            extDaily[d] = { _total: 0 };
+            sources.forEach(s => {
+                const qty = parseNum(row[s.opsCol]);
+                const price = prices[s.name] || 0;
+                extDaily[d][s.name] = { qty, price, cost: Math.round(qty * price) };
+                extDaily[d]._total += extDaily[d][s.name].cost;
+            });
+        });
+    }
+
+    // ── 용도별 수요 일별 집계 ──
+    const demandCats = ['주택용난방','업무용난방','업무용냉방','공공용난방','공공용(수영장)','공공용냉방'];
+    const baseCats = ['주택용난방','업무용난방','업무용냉방','공공용난방','공공용냉방']; // CSV에 있는 컬럼
+    const heatQtyDaily = {};
+
+    // 열요금 단가 (먼저 로드 — 수영장비율 필요)
+    const heatRates = {};
+    let swimRatioVal = 0;
+    if (DATA.heat_rate_table) {
+        const hrH = DATA.heat_rate_table.headers;
+        const srIdx = hrH.indexOf('수영장비율(%)');
+        DATA.heat_rate_table.rows.forEach(row => {
+            if (Number(row[0]) === selMonth) {
+                hrH.forEach((h, i) => { if (i > 0) heatRates[h] = parseNum(row[i]); });
+                if (srIdx >= 0) swimRatioVal = parseNum(row[srIdx]);
+            }
+        });
+    }
+
+    if (DATA.sales_hourly) {
+        const shH = DATA.sales_hourly.headers;
+        const colMap = {};
+        baseCats.forEach(c => colMap[c] = shH.indexOf(c));
+        DATA.sales_hourly.rows.forEach(row => {
+            const m = Number(row[0]), d = Number(row[1]);
+            if (m !== selMonth) return;
+            if (!heatQtyDaily[d]) { heatQtyDaily[d] = {}; demandCats.forEach(c => heatQtyDaily[d][c] = 0); }
+            baseCats.forEach(c => { if (colMap[c] >= 0) heatQtyDaily[d][c] += Number(row[colMap[c]]) || 0; });
+        });
+        // 공공용난방에서 수영장비율 분리
+        Object.values(heatQtyDaily).forEach(hq => {
+            const total = hq['공공용난방'] || 0;
+            const swimQty = total * swimRatioVal;
+            hq['공공용(수영장)'] = swimQty;
+            hq['공공용난방'] = total - swimQty;
+        });
+    }
+
+    const rateMap = { '주택용난방': '주택용', '업무용난방': '업무용', '업무용냉방': '업무용', '공공용난방': '공공용', '공공용(수영장)': '_swim', '공공용냉방': '공공용' };
+    const catShort = { '주택용난방': '주택', '업무용난방': '업무(난)', '업무용냉방': '업무(냉)', '공공용난방': '공공(난)', '공공용(수영장)': '수영장', '공공용냉방': '공공(냉)' };
+
+    // ── CP 일별 (평일/휴일 구분) ──
+    let cpWeekday = 0, cpHoliday = 0;
+    if (DATA.cp_monthly) {
+        const cpH = DATA.cp_monthly.headers;
+        const cpWdIdx = cpH.indexOf('평일CP'), cpHolIdx = cpH.indexOf('휴일CP');
+        DATA.cp_monthly.rows.forEach(row => {
+            if (Number(row[0]) === selMonth) {
+                cpWeekday = cpWdIdx >= 0 ? (Number(row[cpWdIdx]) || 0) : 0;
+                cpHoliday = cpHolIdx >= 0 ? (Number(row[cpHolIdx]) || 0) : 0;
+            }
+        });
+    }
+
+    // ── 인테코 판매 일별 ──
+    const intecoDaily = {};
+    if (DATA.sales_daily) {
+        const sdH = DATA.sales_daily.headers;
+        const intecoCol = sdH.indexOf('인테코');
+        if (intecoCol >= 0) DATA.sales_daily.rows.forEach(row => {
+            const m = Number(row[0]), d = Number(row[1]);
+            if (m === selMonth) intecoDaily[d] = { qty: Number(row[intecoCol]) || 0 };
+        });
+    }
+    const intecoPriceDaily = {};
+    if (DATA.sale_prices_daily) {
+        const prH = DATA.sale_prices_daily.headers;
+        const ipCol = prH.indexOf('인테코(판매)');
+        if (ipCol >= 0) DATA.sale_prices_daily.rows.forEach(row => {
+            const m = Number(row[0]), d = Number(row[1]);
+            if (m === selMonth) intecoPriceDaily[d] = Number(row[ipCol]) || 0;
+        });
+    }
+
+    // ── 기본료 (월별 고정) ──
+    const baseFee = heatRates['기본료'] || 0;
+
+    // ── 활성 외부열원 필터 ──
+    const activeExt = extSrcNames.filter(name => {
+        for (const d of days) if (extDaily[d.day]?.[name]?.qty > 0) return true;
+        return false;
+    });
+
+    // ── 포맷 함수 ──
+    const fmtW = v => v === 0 ? '-' : Math.round(v / 10000).toLocaleString();
+    const fmtN = v => v === 0 ? '-' : Math.round(v).toLocaleString();
+    const fmtQ = v => v === 0 ? '-' : v.toFixed(1);
+    const chk = (calc, sim) => {
+        const diff = calc - sim;
+        const absDiff = Math.abs(diff);
+        if (absDiff <= 100) return '<span style="color:#4ade80">✓</span>';
+        const diffW = Math.round(diff / 10000);
+        if (diffW === 0) return '<span style="color:#a3e635">≈</span>';
+        const sign = diffW > 0 ? '+' : '';
+        const color = diffW > 0 ? '#f87171' : '#60a5fa';
+        return `<span style="color:${color}">(${sign}${diffW.toLocaleString()})</span>`;
+    };
+
+    const R = 'text-align:right';
+
+    html += '<table class="pv-tbl cd-daily">';
+
+    // ═══ 그룹 헤더 (1행) ═══
+    html += '<thead><tr class="cd-grp">';
+    html += '<th class="cd-fix-day">&nbsp;</th>';
+    html += '<th class="cd-fix-dow">&nbsp;</th>';
+    html += '<th colspan="6" style="color:#67e8f9">CHP</th>';
+    html += '<th colspan="4" style="color:#6ee7b7">PLB</th>';
+    html += '<th colspan="4" style="color:#60a5fa">전력판매</th>';
+    if (activeExt.length > 0) html += `<th colspan="${activeExt.length * 4 + 2}" style="color:#f59e0b">외부수열</th>`;
+    html += `<th colspan="${demandCats.length * 4 + 4 + 2 + 1}" style="color:#a78bfa">열판매 수입</th>`;
+    html += '<th>&nbsp;</th>';
+    html += '</tr>';
+
+    // ═══ 세부 헤더 (2행) ═══
+    html += '<tr class="cd-sub">';
+    html += `<th class="cd-fix-day" >일</th>`;
+    html += `<th class="cd-fix-dow" >요일</th>`;
+    // CHP: 수량, 단가, 가스비, 검증, 기동비, 열량
+    html += `<th >수량<br><span style="color:#475569">(Nm³)</span></th>`;
+    html += `<th >단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
+    html += `<th >가스비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th >기동비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th >열량<br><span style="color:#475569">(Gcal)</span></th>`;
+    // PLB: 수량, 단가, 가스비, 검증
+    html += `<th >수량<br><span style="color:#475569">(Nm³)</span></th>`;
+    html += `<th >단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
+    html += `<th >가스비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+    // 전력: MWh, 판매액, 검증, CP
+    html += '<th>발전<br><span style="color:#475569">(MWh)</span></th>';
+    html += '<th>판매액<br><span style="color:#475569">(만원)</span></th>';
+    html += '<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>';
+    html += '<th>CP<br><span style="color:#475569">(만원)</span></th>';
+    // 외부열원별: Gcal, 단가, 비용, 검증
+    activeExt.forEach(name => {
+        const short = name.length > 4 ? name.slice(0, 4) + '..' : name;
+        html += `<th title="${name}">${short}<br><span style="color:#475569">(Gcal)</span></th>`;
+        html += `<th>단가<br><span style="color:#475569">(원)</span></th>`;
+        html += `<th>비용<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+    });
+    // 외부수열 소계/검증
+    if (activeExt.length > 0) {
+        html += '<th style="font-weight:700;color:#f59e0b">소계<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>';
+    }
+    // 열판매: 기본료 + 용도별(Gcal,단가,수입,검증) + 인테코(Gcal,단가,수입,검증) + 소계/검증
+    html += '<th>기본료<br><span style="color:#475569">(만원)</span></th>';
+    demandCats.forEach(cat => {
+        html += `<th>${catShort[cat]}<br><span style="color:#475569">(Gcal)</span></th>`;
+        html += `<th>단가<br><span style="color:#475569">(원)</span></th>`;
+        html += `<th>수입<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+    });
+    html += '<th>인테코<br><span style="color:#475569">(Gcal)</span></th>';
+    html += '<th>단가<br><span style="color:#475569">(원)</span></th>';
+    html += '<th>수입<br><span style="color:#475569">(만원)</span></th>';
+    html += '<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>';
+    html += '<th style="font-weight:700;color:#a78bfa">소계<br><span style="color:#475569">(만원)</span></th>';
+    html += '<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>';
+    html += `<th style="font-weight:700;color:#e2e8f0">순비용<br><span style="color:#475569">(만원)</span></th>`;
+    html += '</tr></thead><tbody>';
+
+    // ═══ 일별 데이터 행 ═══
+    const sums = { chpNg: 0, chpFuel: 0, chpCalc: 0, startup: 0, chpHeat: 0, plbNg: 0, plbFuel: 0, plbCalc: 0, elecMWh: 0, elecRev: 0, elecCalc: 0, net: 0 };
+    const extSums = {}; activeExt.forEach(n => extSums[n] = { qty: 0, cost: 0 });
+    const catSums = {}; demandCats.forEach(c => catSums[c] = { qty: 0, rev: 0 });
+
+    days.forEach(r => {
+        const ed = extDaily[r.day] || {};
+        const hq = heatQtyDaily[r.day] || {};
+        const extCost = ed._total || 0;
+        const netCost = (r.chpFuelCost || 0) + (r.startupCost || 0) + (r.plbFuelCost || 0) + extCost - (r.chpElecRev || 0);
+
+        // 검증 계산
+        const chpCalc = Math.round((r.chpNg || 0) * (r.ngCostNm3 || 0));
+        const plbCalc = Math.round((r.plbNg || 0) * (r.ngPLBNm3 || 0));
+        let elecCalc = 0;
+        if (r.hourly) r.hourly.forEach(hr => { if (hr.chpPowerKWh > 0) elecCalc += (hr.mp || 0) * hr.chpPowerKWh; });
+        elecCalc = Math.round(elecCalc);
+
+        sums.chpNg += r.chpNg || 0; sums.chpFuel += r.chpFuelCost || 0; sums.chpCalc += chpCalc;
+        sums.startup += r.startupCost || 0; sums.chpHeat += r.chpHeat || 0;
+        sums.plbNg += r.plbNg || 0; sums.plbFuel += r.plbFuelCost || 0; sums.plbCalc += plbCalc;
+        sums.elecMWh += r.chpPower || 0; sums.elecRev += r.chpElecRev || 0; sums.elecCalc += elecCalc;
+        sums.net += netCost;
+
+        const dowColor = r.isWeekend || r.isHoliday ? '#f87171' : r.isMaint ? '#a78bfa' : '#94a3b8';
+        const netColor = netCost > 0 ? '#f87171' : netCost < 0 ? '#4ade80' : '#64748b';
+
+        const C = '#c0c8d8'; // 기본 데이터 색
+        const V = 'text-align:center;padding:2px'; // 검증 셀
+
+        html += '<tr>';
+        html += `<td class="cd-fix-day" style="font-weight:600;color:#e2e8f0">${r.day}</td>`;
+        html += `<td class="cd-fix-dow" style="color:${dowColor}">${r.dowName}</td>`;
+        // CHP
+        html += `<td style="${R};color:${C}">${fmtN(r.chpNg)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtN(r.ngCostNm3)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(r.chpFuelCost)}</td>`;
+        html += `<td style="${V}">${r.chpNg > 0 ? chk(chpCalc, r.chpFuelCost || 0) : '-'}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(r.startupCost)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtQ(r.chpHeat)}</td>`;
+        // PLB
+        html += `<td style="${R};color:${C}">${fmtN(r.plbNg)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtN(r.ngPLBNm3)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(r.plbFuelCost)}</td>`;
+        html += `<td style="${V}">${r.plbNg > 0 ? chk(plbCalc, r.plbFuelCost || 0) : '-'}</td>`;
+        // 전력
+        html += `<td style="${R};color:${C}">${r.chpPower > 0 ? r.chpPower.toFixed(1) : '-'}</td>`;
+        html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(r.chpElecRev)}</td>`;
+        html += `<td style="${V}">${r.chpPower > 0 ? chk(elecCalc, r.chpElecRev || 0) : '-'}</td>`;
+        // CP
+        const dayCP = (r.isWeekend || r.isHoliday) ? cpHoliday : cpWeekday;
+        sums.cp = (sums.cp || 0) + dayCP;
+        html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(dayCP)}</td>`;
+        // 외부열원별
+        let extRowCost = 0;
+        activeExt.forEach(name => {
+            const e = ed[name] || { qty: 0, price: 0, cost: 0 };
+            extSums[name].qty += e.qty; extSums[name].cost += e.cost;
+            extRowCost += e.cost;
+            const extCalc = Math.round(e.qty * e.price);
+            html += `<td style="${R};color:${C}">${fmtQ(e.qty)}</td>`;
+            html += `<td style="${R};color:${C}">${e.qty > 0 ? fmtN(e.price) : '-'}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(e.cost)}</td>`;
+            html += `<td style="${V}">${e.qty > 0 ? chk(extCalc, e.cost) : '-'}</td>`;
+        });
+        if (activeExt.length > 0) {
+            html += `<td style="${R};font-weight:700;color:#f87171">${fmtW(extRowCost)}</td>`;
+            html += `<td style="${V}">${extRowCost > 0 ? chk(extRowCost, extCost) : '-'}</td>`;
+        }
+        // 열판매: 기본료
+        sums.baseFee = (sums.baseFee || 0) + baseFee;
+        html += `<td style="${R};color:${C}">${fmtW(baseFee)}</td>`;
+        // 열판매 용도별
+        let heatRowRev = baseFee;
+        demandCats.forEach(cat => {
+            const qty = hq[cat] || 0;
+            const rk = rateMap[cat];
+            const price = rk === '_swim' ? Math.round((heatRates['공공용'] || 0) * 0.5) : (heatRates[rk] || 0);
+            const rev = Math.round(qty * price);
+            const heatCalc = Math.round(qty * price);
+            catSums[cat].qty += qty; catSums[cat].rev += rev;
+            heatRowRev += rev;
+            html += `<td style="${R};color:${C}">${fmtQ(qty)}</td>`;
+            html += `<td style="${R};color:${C}">${qty > 0 ? fmtN(price) : '-'}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(rev)}</td>`;
+            html += `<td style="${V}">${qty > 0 ? chk(heatCalc, rev) : '-'}</td>`;
+        });
+        // 인테코
+        const intQ = intecoDaily[r.day]?.qty || 0;
+        const intP = intecoPriceDaily[r.day] || 0;
+        const intRev = Math.round(intQ * intP);
+        const intCalc = Math.round(intQ * intP);
+        sums.intecoQty = (sums.intecoQty || 0) + intQ;
+        sums.intecoRev = (sums.intecoRev || 0) + intRev;
+        heatRowRev += intRev;
+        html += `<td style="${R};color:${C}">${fmtQ(intQ)}</td>`;
+        html += `<td style="${R};color:${C}">${intQ > 0 ? fmtN(intP) : '-'}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(intRev)}</td>`;
+        html += `<td style="${V}">${intQ > 0 ? chk(intCalc, intRev) : '-'}</td>`;
+        // 열판매 소계
+        html += `<td style="${R};font-weight:700;color:#60a5fa">${fmtW(heatRowRev)}</td>`;
+        html += `<td style="${V}">-</td>`;
+        // 순비용
+        html += `<td style="${R};font-weight:700;color:${netColor}">${fmtW(netCost)}</td>`;
+        html += '</tr>';
+    });
+
+    // ═══ 합계행 ═══
+    const sumNetColor = sums.net > 0 ? '#f87171' : '#4ade80';
+    html += '<tr class="cd-sum" style="font-weight:700;border-top:2px solid #334155">';
+    html += '<td class="cd-fix-day" style="color:#e2e8f0" colspan="2">합계</td>';
+    html += `<td style="${R};color:#94a3b8">${fmtN(sums.chpNg)}</td><td style="${R}">-</td>`;
+    html += `<td style="${R};color:#67e8f9">${fmtW(sums.chpFuel)}</td>`;
+    html += `<td style="text-align:center">${chk(sums.chpCalc, sums.chpFuel)}</td>`;
+    html += `<td style="${R};color:#f59e0b">${fmtW(sums.startup)}</td>`;
+    html += `<td style="${R};color:#67e8f9">${fmtQ(sums.chpHeat)}</td>`;
+    html += `<td style="${R};color:#94a3b8">${fmtN(sums.plbNg)}</td><td style="${R}">-</td>`;
+    html += `<td style="${R};color:#6ee7b7">${fmtW(sums.plbFuel)}</td>`;
+    html += `<td style="text-align:center">${chk(sums.plbCalc, sums.plbFuel)}</td>`;
+    html += `<td style="${R};color:#94a3b8">${sums.elecMWh.toFixed(1)}</td>`;
+    html += `<td style="${R};color:#60a5fa">${fmtW(sums.elecRev)}</td>`;
+    html += `<td style="text-align:center">${chk(sums.elecCalc, sums.elecRev)}</td>`;
+    html += `<td style="${R};color:#60a5fa">${fmtW(sums.cp || 0)}</td>`;
+    let sumExtCost = 0;
+    activeExt.forEach(name => {
+        html += `<td style="${R};color:#94a3b8">${fmtQ(extSums[name].qty)}</td><td style="${R}">-</td>`;
+        html += `<td style="${R};color:#f59e0b">${fmtW(extSums[name].cost)}</td>`;
+        html += '<td style="text-align:center"><span style="color:#4ade80">✓</span></td>';
+        sumExtCost += extSums[name].cost;
+    });
+    if (activeExt.length > 0) {
+        html += `<td style="${R};font-weight:700;color:#f59e0b">${fmtW(sumExtCost)}</td>`;
+        html += '<td style="text-align:center">✓</td>';
+    }
+    // 기본료
+    html += `<td style="${R};color:#a78bfa">${fmtW(sums.baseFee || 0)}</td>`;
+    let sumHeatRev = (sums.baseFee || 0);
+    demandCats.forEach(cat => {
+        html += `<td style="${R};color:#94a3b8">${fmtQ(catSums[cat].qty)}</td>`;
+        html += `<td style="${R}">-</td>`;
+        html += `<td style="${R};color:#a78bfa">${fmtW(catSums[cat].rev)}</td>`;
+        html += '<td style="text-align:center"><span style="color:#4ade80">✓</span></td>';
+        sumHeatRev += catSums[cat].rev;
+    });
+    // 인테코
+    html += `<td style="${R};color:#94a3b8">${fmtQ(sums.intecoQty || 0)}</td>`;
+    html += `<td style="${R}">-</td>`;
+    html += `<td style="${R};color:#a78bfa">${fmtW(sums.intecoRev || 0)}</td>`;
+    html += '<td style="text-align:center"><span style="color:#4ade80">✓</span></td>';
+    sumHeatRev += (sums.intecoRev || 0);
+    html += `<td style="${R};font-weight:700;color:#a78bfa">${fmtW(sumHeatRev)}</td>`;
+    html += '<td style="text-align:center">-</td>';
+    html += `<td style="${R};font-weight:800;color:${sumNetColor}">${fmtW(sums.net)}</td>`;
+    html += '</tr></tbody></table>';
+    html += '<div style="height:40px"></div>';
+    el.innerHTML = html;
+}
+
 // ─── 일별 상세 테이블 렌더링 ───
 function renderPlanDaily(simResults) {
     const el = document.getElementById('pv_plan_daily');
@@ -7294,17 +8690,18 @@ function runOptimization() {
     const simWrap = document.getElementById('planSimResult');
     if (simWrap) simWrap.style.display = '';
 
-    // 월별 탭 활성화
+    // 일별 탭 활성화
     document.querySelectorAll('#planTabs .inner-tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.plan-panel').forEach(p => p.classList.remove('active'));
-    document.querySelector('#planTabs .inner-tab[data-ptab="plan_monthly_sim"]')?.classList.add('active');
-    document.getElementById('plan_monthly_sim')?.classList.add('active');
+    document.querySelector('#planTabs .inner-tab[data-ptab="plan_daily"]')?.classList.add('active');
+    document.getElementById('plan_daily')?.classList.add('active');
 
     renderPlanMonthly(simResults);
     renderPlanCharts(simResults);
     renderPlanDaily(simResults);
     renderContribution(simResults);
     renderAllCosts(simResults);
+    renderCostVerify(simResults);
 
     // 로직 흐름 버튼 활성화
     const btnLogic = document.getElementById('btnShowLogicFlow');
@@ -7397,9 +8794,9 @@ function showLogicFlowModal() {
     html += '<div style="display:flex;align-items:center;gap:16px">';
     html += '<h3 style="margin:0;font-size:20px;font-weight:900;color:#f1f5f9;letter-spacing:-0.02em">시뮬레이션 로직 흐름</h3>';
     html += '<div style="display:flex;gap:6px">';
-    html += '<button class="lfm-tab active" data-ltab="intro" onclick="_switchLogicTab(\'intro\')">데이터 준비</button>';
-    html += '<button class="lfm-tab" data-ltab="basic" onclick="_switchLogicTab(\'basic\')">전체 흐름</button>';
-    html += '<button class="lfm-tab" data-ltab="detail" onclick="_switchLogicTab(\'detail\')">최적화 방식</button>';
+    html += '<button class="lfm-tab active" data-ltab="intro" onclick="_switchLogicTab(\'intro\')">입력 데이터</button>';
+    html += '<button class="lfm-tab" data-ltab="basic" onclick="_switchLogicTab(\'basic\')">실행 흐름</button>';
+    html += '<button class="lfm-tab" data-ltab="detail" onclick="_switchLogicTab(\'detail\')">운전 원칙</button>';
     html += '</div></div>';
     html += '<button onclick="document.getElementById(\'logicFlowOverlay\').remove()" style="border:none;background:rgba(51,65,85,0.4);width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:#94a3b8;display:flex;align-items:center;justify-content:center;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(239,68,68,0.3)\';this.style.color=\'#fca5a5\'" onmouseleave="this.style.background=\'rgba(51,65,85,0.4)\';this.style.color=\'#94a3b8\'">\u2715</button>';
     html += '</div>';
@@ -7478,16 +8875,43 @@ function showLogicFlowModal() {
 
     // ═══ [2] 전체 흐름 탭 ═══
     html += '<div id="logicPanel_basic" class="logic-panel" style="display:none">';
-    html += '<p style="font-size:14px;color:#94a3b8;margin:0 0 20px;line-height:1.7">시뮬레이션은 <b style="color:#e2e8f0">4단계</b>를 거쳐 진행됩니다. 각 단계의 결과가 다음 단계의 입력이 됩니다.</p>';
+    html += '<p style="font-size:14px;color:#94a3b8;margin:0 0 20px;line-height:1.7">1월 1일부터 12월 31일까지 <b style="color:#e2e8f0">하루씩 순차적으로</b> 5단계를 반복합니다. 전날의 축열 잔량이 다음 날의 시작값이 됩니다.</p>';
 
     const steps = [
-        { n:'1', color:'#8b5cf6', glow:'139,92,246', title:'연간 가동계획 수립', desc:'1년 365일 각각에 대해 <b style="color:#f1f5f9">"CHP를 몇 시간, 어느 부하율로 가동할 것인가"</b>를 결정합니다.<br>이때 열수요, 외부수열, 전력가격, 기동비용, 축열조 상태를 <b style="color:#f1f5f9">모두 종합</b>하여 가장 경제적인 조합을 찾습니다.', badge:'예: "1월 15일 \u2192 CHP 18시간, 100% 부하" / "4월 2일 \u2192 CHP 0시간(정비일)"', badgeBg:'rgba(139,92,246,0.15)', badgeColor:'#c4b5fd' },
-        { n:'2', color:'#06b6d4', glow:'6,182,212', title:'하루 중 가동 시간대 배치', desc:'1단계에서 "18시간 가동"이 결정되면, <b style="color:#f1f5f9">하루 중 어느 시간에 켜고 끌지</b>를 정합니다.<br>전력가격이 높은 시간대에 가동하면 전기 판매 수익이 커지고, 열수요가 많은 시간대에 맞추면 축열조가 안정됩니다.<br>모든 가능한 시작 시간을 시뮬레이션해서 <b style="color:#f1f5f9">가장 수익이 높고 축열조가 안전한</b> 배치를 선택합니다.', badge:'보일러(PLB)도 축열조가 부족해지는 시점을 예측하여 자동 배치됩니다', badgeBg:'rgba(6,182,212,0.15)', badgeColor:'#67e8f9' },
-        { n:'3', color:'#10b981', glow:'16,185,129', title:'시간별 시뮬레이션 실행', desc:'2단계에서 정한 배치대로 <b style="color:#f1f5f9">0시부터 23시까지 한 시간씩</b> 시뮬레이션합니다.<br>매 시간 축열조에 들어오는 열(외부수열, CHP, 보일러)과 나가는 열(수요)을 계산하여 <b style="color:#f1f5f9">축열조 잔량</b>을 추적합니다.<br>전력가격과 CHP 발전량을 곱해 <b style="color:#f1f5f9">시간별 전기 판매 수익</b>도 계산합니다.', badge:'각 날의 마지막 축열조 잔량이 다음 날의 시작값이 됩니다', badgeBg:'rgba(16,185,129,0.15)', badgeColor:'#6ee7b7' },
-        { n:'4', color:'#f59e0b', glow:'245,158,11', title:'결과 집계 및 손익 계산', desc:'시간별 결과를 <b style="color:#f1f5f9">일별 \u2192 월별</b>로 모아서 최종 보고서를 만듭니다.<br><b style="color:#cbd5e1">비용:</b> CHP 연료비 + 보일러 연료비 + 기동비용<br><b style="color:#cbd5e1">수입:</b> 전력 판매(열제약매출) + 용량요금(한전 고정 수입)<br><b style="color:#cbd5e1">운영손익:</b> 수입 - 비용 = 공헌이익', badge:'월별 차트, 일별 상세 보기, 열판매 수익 등을 확인할 수 있습니다', badgeBg:'rgba(245,158,11,0.15)', badgeColor:'#fcd34d' },
+        { n:'1', color:'#8b5cf6', glow:'139,92,246', title:'데이터 준비',
+          desc:'365일의 입력 데이터를 정리합니다.<br><b style="color:#f1f5f9">시간별 열수요, 외부수열, SMP(전력가격), NG(가스)단가, 공휴일</b> 등을 일별 배열로 변환하고, CHP/PLB 성능표·축열조 설정·기동비용 곡선을 초기화합니다.',
+          badge:'이 단계는 최초 1회만 실행됩니다', badgeBg:'rgba(139,92,246,0.15)', badgeColor:'#c4b5fd' },
+        { n:'2', color:'#06b6d4', glow:'6,182,212', title:'CHP 스케줄링',
+          desc:'오늘 CHP를 <b style="color:#f1f5f9">몇 시간, 어느 시간대에, 어떤 부하로</b> 가동할지 결정합니다.<br>' +
+          '<span style="color:#67e8f9">\u2022</span> 오늘 필요한 열량 = 수요 - 외부열 + 주말대비 축열분<br>' +
+          '<span style="color:#67e8f9">\u2022</span> 필요 열량에서 가동 시간수를 역산하고, SMP가 높은 시간대에 블록 배치<br>' +
+          '<span style="color:#67e8f9">\u2022</span> 모든 (시작시각 \u00D7 시간수 \u00D7 부하) 후보를 시뮬레이션하여 <b style="color:#f1f5f9">수익 최대</b> 조합 선택<br>' +
+          '<span style="color:#67e8f9">\u2022</span> 주말/공휴일에는 축열로 버티고 CHP 자제, 금요일에 미리 축열 충전',
+          badge:'하루 1회 기동 · 연속 최소 4시간 · 축열조 넘침 방지', badgeBg:'rgba(6,182,212,0.15)', badgeColor:'#67e8f9' },
+        { n:'3', color:'#10b981', glow:'16,185,129', title:'PLB 스케줄링',
+          desc:'CHP만으로 축열이 부족해지는 날에 <b style="color:#f1f5f9">보일러(PLB)를 자동 투입</b>합니다.<br>' +
+          '<span style="color:#6ee7b7">\u2022</span> CHP 시뮬 결과에서 축열 \u003C 최소잔량 시점을 스캔<br>' +
+          '<span style="color:#6ee7b7">\u2022</span> 부족 예상 시점보다 <b style="color:#f1f5f9">미리 기동</b> (사전 대응)<br>' +
+          '<span style="color:#6ee7b7">\u2022</span> 1대 100%부터 시도, 부족하면 2대·3대로 확장<br>' +
+          '<span style="color:#6ee7b7">\u2022</span> CHP 결과는 절대 변경하지 않고, PLB 열과 축열만 재계산',
+          badge:'CHP 보조 역할 · 하루 1회 기동 · 대수 최소화', badgeBg:'rgba(16,185,129,0.15)', badgeColor:'#6ee7b7' },
+        { n:'4', color:'#f59e0b', glow:'245,158,11', title:'검증',
+          desc:'CHP+PLB 배치 결과가 <b style="color:#f1f5f9">물리적 제약을 위반하지 않는지</b> 확인합니다.<br>' +
+          '<span style="color:#fcd34d">\u2022</span> 축열조 하한 위반 (underflow): 최소잔량 미만<br>' +
+          '<span style="color:#fcd34d">\u2022</span> 축열조 상한 위반 (overflow): 용량 초과<br>' +
+          '<span style="color:#fcd34d">\u2022</span> 최소 가동시간 / 최소 정지시간 위반<br>' +
+          '<span style="color:#fcd34d">\u2022</span> 위반 건수는 결과 요약에 표시됩니다',
+          badge:'제약 위반이 있으면 경고가 표시됩니다', badgeBg:'rgba(245,158,11,0.15)', badgeColor:'#fcd34d' },
+        { n:'5', color:'#ef4444', glow:'239,68,68', title:'비용 집계',
+          desc:'하루의 운영 비용과 수익을 집계합니다.<br>' +
+          '<b style="color:#cbd5e1">비용:</b> CHP 연료비 + PLB 연료비 + CHP 기동비 + PLB 기동비<br>' +
+          '<b style="color:#cbd5e1">수입:</b> 전력 판매(MP \u00D7 발전량) + 용량요금<br>' +
+          '<b style="color:#cbd5e1">손익:</b> 수입 - 비용 = 공헌이익<br>' +
+          '일별 결과를 <b style="color:#f1f5f9">월별 \u2192 연간</b>으로 합산하여 최종 보고서를 생성합니다.',
+          badge:'월별 차트, 일별 상세, 열판매 수익 확인 가능', badgeBg:'rgba(239,68,68,0.15)', badgeColor:'#fca5a5' },
     ];
     steps.forEach((s, i) => {
-        html += `<div style="display:flex;gap:16px;margin-bottom:${i<3?'16':'0'}px">`;
+        html += `<div style="display:flex;gap:16px;margin-bottom:${i<steps.length-1?'16':'0'}px">`;
         html += `<div style="flex-shrink:0;width:52px;height:52px;background:${s.color};border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;box-shadow:0 4px 20px rgba(${s.glow},0.35);animation:lfm-fadeUp 0.5s cubic-bezier(.34,1.56,.64,1) ${i*0.1}s both">${s.n}</div>`;
         html += `<div class="lfm-step-card" style="flex:1;animation-delay:${i*0.1}s;border-left:2px solid ${s.color}40">`;
         html += `<div style="font-size:16px;font-weight:800;color:${s.color};margin-bottom:8px;letter-spacing:-0.02em">${s.title}</div>`;
@@ -7497,73 +8921,76 @@ function showLogicFlowModal() {
     });
     html += '</div>';
 
-    // ═══ [3] 최적화 방식 탭 ═══
+    // ═══ [3] CHP 운전 원칙 탭 ═══
     html += '<div id="logicPanel_detail" class="logic-panel" style="display:none">';
-    html += '<p style="font-size:14px;color:#94a3b8;margin:0 0 20px;line-height:1.7">1단계(연간 가동계획)에서 사용할 수 있는 <b style="color:#e2e8f0">두 가지 최적화 방식</b>을 비교합니다.</p>';
+    html += '<p style="font-size:14px;color:#94a3b8;margin:0 0 20px;line-height:1.7">CHP와 PLB 스케줄링에 적용되는 <b style="color:#e2e8f0">운전 원칙</b>입니다.</p>';
 
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">';
 
-    // 정밀 최적화
-    html += '<div class="lfm-card" style="animation-delay:0s;border-top:3px solid #8b5cf6">';
+    // CHP 원칙
+    html += '<div class="lfm-card" style="animation-delay:0s;border-top:3px solid #06b6d4">';
     html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
-    html += '<div style="width:36px;height:36px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:900;box-shadow:0 4px 16px rgba(139,92,246,0.3)">DP</div>';
-    html += '<div style="font-size:17px;font-weight:900;color:#c4b5fd;letter-spacing:-0.02em">정밀 최적화</div>';
+    html += '<div style="width:36px;height:36px;background:linear-gradient(135deg,#06b6d4,#0891b2);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:900;box-shadow:0 4px 16px rgba(6,182,212,0.3)">CHP</div>';
+    html += '<div style="font-size:17px;font-weight:900;color:#67e8f9;letter-spacing:-0.02em">CHP 운전 원칙</div>';
     html += '</div>';
     html += '<div style="font-size:12px;color:#cbd5e1;line-height:2.0">';
-    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">작동 원리</div>';
-    html += '1년 전체를 <b style="color:#f1f5f9">한꺼번에</b> 보고, 가장 비용이 적은 경로를 찾습니다.<br>';
-    html += '마지막 날(12/31)부터 첫날(1/1)로 <b style="color:#f1f5f9">거꾸로</b> 계산하면서,<br>';
-    html += '"오늘 CHP를 켜면 내일 이후 비용이 어떻게 달라지나?"를 모든 경우에 대해 비교합니다.<br><br>';
-    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">고려하는 요소</div>';
-    html += '<span style="color:#a78bfa">\u2022</span> 현재 축열조에 열이 얼마나 남아 있는지<br>';
-    html += '<span style="color:#a78bfa">\u2022</span> CHP가 꺼진 지 며칠 됐는지 (기동비용 결정)<br>';
-    html += '<span style="color:#a78bfa">\u2022</span> 각 부하율(60%~100%)에서의 연료비와 전기 수익<br>';
-    html += '<span style="color:#a78bfa">\u2022</span> 내일부터 연말까지의 총 비용까지 모두 고려<br><br>';
-    html += '<div style="padding:12px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:12px;font-size:11px;color:#c4b5fd;line-height:1.7">';
-    html += '<b>장점:</b> 전체적으로 가장 저렴한 답을 보장<br>';
-    html += '<b>예시:</b> "주말에 끄면 월요일 기동비가 비싸니까, 주말에도 최소 부하로 돌리는 게 낫다"는 판단을 자동으로 내림';
+    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">기본 원칙</div>';
+    html += '<span style="color:#67e8f9">\u2460</span> <b style="color:#f1f5f9">하루 1회 기동</b> \u2014 한번 켜면 연속, 껐다 켰다 안 함<br>';
+    html += '<span style="color:#67e8f9">\u2461</span> <b style="color:#f1f5f9">연속 최소 4시간</b> \u2014 너무 짧은 운전은 비효율<br>';
+    html += '<span style="color:#67e8f9">\u2462</span> <b style="color:#f1f5f9">SMP 높은 시간대 가동</b> \u2014 전력 판매 수익 극대화<br>';
+    html += '<span style="color:#67e8f9">\u2463</span> <b style="color:#f1f5f9">2단계 부하</b> \u2014 고수요=고부하, 저수요=저부하<br>';
+    html += '<span style="color:#67e8f9">\u2464</span> <b style="color:#f1f5f9">축열조 넘침 방지</b> \u2014 부하 조절로 overflow 방지<br>';
+    html += '<span style="color:#67e8f9">\u2465</span> <b style="color:#f1f5f9">열원 단가순 배치</b> \u2014 CHP가 항상 싼 건 아님<br><br>';
+    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">주말/공휴일 전략</div>';
+    html += '<span style="color:#67e8f9">\u2022</span> 금요일(공휴일 전날): 축열조 최대 충전<br>';
+    html += '<span style="color:#67e8f9">\u2022</span> 주말/공휴일: 축열로 버티고 CHP 자제<br>';
+    html += '<span style="color:#67e8f9">\u2022</span> 부족 예상 시: 기동 (안전장치)<br><br>';
+    html += '<div style="padding:12px 16px;background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.2);border-radius:12px;font-size:11px;color:#67e8f9;line-height:1.7">';
+    html += '<b>계절 대응:</b> 하절기는 외부열 충분 → CHP 적게. 동절기는 수요 크면 주말 24시간 가동 가능.';
     html += '</div>';
     html += '</div></div>';
 
-    // 빠른 최적화
-    html += '<div class="lfm-card" style="animation-delay:0.1s;border-top:3px solid #22c55e">';
+    // PLB 원칙
+    html += '<div class="lfm-card" style="animation-delay:0.1s;border-top:3px solid #10b981">';
     html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
-    html += '<div style="width:36px;height:36px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:900;box-shadow:0 4px 16px rgba(34,197,94,0.3)">Fast</div>';
-    html += '<div style="font-size:17px;font-weight:900;color:#86efac;letter-spacing:-0.02em">빠른 최적화</div>';
+    html += '<div style="width:36px;height:36px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:900;box-shadow:0 4px 16px rgba(16,185,129,0.3)">PLB</div>';
+    html += '<div style="font-size:17px;font-weight:900;color:#6ee7b7;letter-spacing:-0.02em">PLB 운전 원칙</div>';
     html += '</div>';
     html += '<div style="font-size:12px;color:#cbd5e1;line-height:2.0">';
-    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">작동 원리</div>';
-    html += '두 번에 걸쳐 판단합니다:<br><br>';
-    html += '<b style="color:#86efac">1차 판단 \u2014 우선순위 정하기</b><br>';
-    html += '365일을 전력가격(SMP) 순으로 정렬합니다.<br>';
-    html += 'SMP가 높은 날(전기 비싸게 팔 수 있는 날)부터 CHP 가동을 배정합니다.<br><br>';
-    html += '<b style="color:#86efac">2차 판단 \u2014 날짜 순서대로 시뮬레이션</b><br>';
-    html += '1월 1일부터 시간 순서대로 하루씩 시뮬레이션합니다.<br>';
-    html += '축열조가 넘칠 것 같으면 CHP 가동시간을 줄이고,<br>';
-    html += '전날 CHP를 켰는데 오늘 끄면 기동비가 발생하므로 계속 돌릴지 비교합니다.<br><br>';
-    html += '<div style="padding:12px 16px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:12px;font-size:11px;color:#86efac;line-height:1.7">';
-    html += '<b>장점:</b> 즉시 실행, 직관적인 결과<br>';
-    html += '<b>한계:</b> "하루 단위"로 판단하므로, 전체적으로는 정밀 최적화보다 비용이 다소 높을 수 있음';
+    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">기본 원칙</div>';
+    html += '<span style="color:#6ee7b7">\u2460</span> <b style="color:#f1f5f9">CHP 보조 역할</b> \u2014 CHP가 안 돌면 PLB도 안 돌림<br>';
+    html += '<span style="color:#6ee7b7">\u2461</span> <b style="color:#f1f5f9">현상유지 목적</b> \u2014 축열조가 떨어지지 않게 방어<br>';
+    html += '<span style="color:#6ee7b7">\u2462</span> <b style="color:#f1f5f9">미리 기동</b> \u2014 축열 하락을 예측하여 사전 기동<br>';
+    html += '<span style="color:#6ee7b7">\u2463</span> <b style="color:#f1f5f9">하루 1회 기동</b> \u2014 두 번 돌릴 바에 한 번 길게<br>';
+    html += '<span style="color:#6ee7b7">\u2464</span> <b style="color:#f1f5f9">여유분 축열 후 정지</b> \u2014 다시 안 돌리기 위해 약간 채움<br>';
+    html += '<span style="color:#6ee7b7">\u2465</span> <b style="color:#f1f5f9">대수 최소화</b> \u2014 되도록 1대, 부족하면 2대<br>';
+    html += '<span style="color:#6ee7b7">\u2466</span> <b style="color:#f1f5f9">최소운전 2h, 최소정지 4h</b><br><br>';
+    html += '<div style="margin-bottom:10px;font-weight:700;color:#e2e8f0;font-size:13px">블록 탐색 방식</div>';
+    html += '<span style="color:#6ee7b7">\u2022</span> CHP 시뮬 후 축열 < 최소잔량 시점 탐지<br>';
+    html += '<span style="color:#6ee7b7">\u2022</span> (대수 \u00D7 시작시각 \u00D7 시간수) 모든 조합 시뮬<br>';
+    html += '<span style="color:#6ee7b7">\u2022</span> underflow 해소 + 비용 최소 조합 선택<br><br>';
+    html += '<div style="padding:12px 16px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:12px;font-size:11px;color:#6ee7b7;line-height:1.7">';
+    html += '<b>CHP 영향:</b> PLB는 CHP 결과 위에 얹힘. CHP 스케줄은 절대 변경되지 않음.';
     html += '</div>';
     html += '</div></div>';
     html += '</div>';
 
     // 핵심 개념 설명
     html += '<div class="lfm-card" style="animation-delay:0.2s;border-top:2px solid rgba(100,116,139,0.3)">';
-    html += '<div style="font-size:15px;font-weight:800;color:#e2e8f0;margin-bottom:14px;letter-spacing:-0.01em">핵심 개념 설명</div>';
+    html += '<div style="font-size:15px;font-weight:800;color:#e2e8f0;margin-bottom:14px;letter-spacing:-0.01em">핵심 개념</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;font-size:12px;color:#94a3b8;line-height:1.9">';
 
     html += '<div style="padding:14px;background:rgba(15,23,42,0.6);border-radius:12px;border:1px solid rgba(51,65,85,0.4)">';
-    html += '<div style="font-weight:800;color:#e2e8f0;margin-bottom:8px;font-size:13px">축열조란?</div>';
-    html += '열을 임시로 저장하는 큰 물탱크입니다. CHP/보일러가 만든 열을 저장했다가, 수요가 있을 때 공급합니다. 항상 최소 잔량 이상을 유지해야 합니다.</div>';
+    html += '<div style="font-weight:800;color:#e2e8f0;margin-bottom:8px;font-size:13px">축열조</div>';
+    html += '열을 저장하는 물탱크(1,500Gcal). CHP/PLB가 만든 열을 저장했다가 수요에 공급합니다. 최소잔량 이상을 항상 유지해야 합니다.</div>';
 
     html += '<div style="padding:14px;background:rgba(15,23,42,0.6);border-radius:12px;border:1px solid rgba(51,65,85,0.4)">';
-    html += '<div style="font-weight:800;color:#e2e8f0;margin-bottom:8px;font-size:13px">CHP vs 보일러(PLB)</div>';
-    html += 'CHP는 열과 전기를 동시에 만듭니다. 전기를 팔아 수익을 얻지만 효율이 보일러보다 낮습니다. 보일러는 열만 만들지만 더 효율적입니다. 보일러는 CHP만으로 부족할 때 보조로 투입됩니다.</div>';
+    html += '<div style="font-weight:800;color:#e2e8f0;margin-bottom:8px;font-size:13px">CHP vs PLB</div>';
+    html += 'CHP는 열+전기를 동시 생산. 전기를 팔아 수익을 얻어 실질 열단가가 낮음. PLB는 열만 생산하여 단가가 높지만, CHP가 부족한 날에 보조 투입합니다.</div>';
 
     html += '<div style="padding:14px;background:rgba(15,23,42,0.6);border-radius:12px;border:1px solid rgba(51,65,85,0.4)">';
-    html += '<div style="font-weight:800;color:#e2e8f0;margin-bottom:8px;font-size:13px">최적화의 목표</div>';
-    html += '"열을 안정적으로 공급하면서, 총 비용(연료비 + 기동비 - 전기판매)을 최소화하는 것"입니다. CHP를 많이 돌리면 전기는 많이 팔지만 연료비도 늘어나므로, 균형점을 찾는 것이 핵심입니다.</div>';
+    html += '<div style="font-weight:800;color:#e2e8f0;margin-bottom:8px;font-size:13px">최적화 목표</div>';
+    html += '열 안정 공급 + 비용 최소화. CHP 연료비·기동비를 쓰되 전기 판매로 회수하고, PLB는 최소한으로만 투입. 축열조를 활용해 주말에는 쉬는 전략입니다.</div>';
 
     html += '</div></div>';
     html += '</div>';
@@ -7684,9 +9111,9 @@ document.querySelectorAll('.pipe-step').forEach(btn => {
         if (btn.dataset.tab === 'tab-result' && PLAN_RESULTS) {
             requestAnimationFrame(() => renderContribution(PLAN_RESULTS));
         }
-        // 비용산출 탭 진입 시 렌더
+        // 계산검증 탭 진입 시 렌더
         if (btn.dataset.tab === 'tab-cost') {
-            requestAnimationFrame(() => renderAllCosts(PLAN_RESULTS));
+            requestAnimationFrame(() => renderCostVerify(PLAN_RESULTS));
         }
     });
 });

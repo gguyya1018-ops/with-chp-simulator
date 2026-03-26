@@ -661,7 +661,11 @@ td[style*="position:sticky"] {
 /* ═══ 데이터 패널 ═══ */
 .data-panel, .plan-panel, .result-panel, .calc-panel { display:none; }
 .data-panel.active, .plan-panel.active, .result-panel.active, .calc-panel.active { display:block; }
-.pv-body { max-height:calc(100vh - 240px); overflow:auto; }
+.pv-body { max-height:calc(100vh - 240px); overflow:auto; scrollbar-gutter:stable; }
+.pv-body::-webkit-scrollbar { width:8px; height:8px; }
+.pv-body::-webkit-scrollbar-track { background:rgba(15,23,42,0.5); }
+.pv-body::-webkit-scrollbar-thumb { background:#334155; border-radius:4px; }
+.pv-body::-webkit-scrollbar-thumb:hover { background:#475569; }
 
 /* ═══ 설정 스텝 ═══ */
 .settings-steps {
@@ -720,7 +724,14 @@ td[style*="position:sticky"] {
     border-bottom:1px solid var(--border-medium);
 }
 /* 정비일정 레이아웃 */
-/* ═══ 외부수열원 관리 테이블 ═══ */
+/* ═══ 열원적용 설정 ═══ */
+.src-layout { display:flex; gap:32px; align-items:flex-start; margin-top:16px; }
+.src-section { flex:0 0 auto; }
+.src-section-head {
+    display:flex; align-items:center; gap:6px; margin-bottom:8px;
+    font-size:13px; font-weight:600; color:#e0e4ea;
+}
+.ext-type-self { background:rgba(245,158,11,.12); color:#fbbf24; }
 .ext-src-tbl { width:auto; max-width:600px; }
 .ext-src-tbl th { font-size:11px; color:#aaa; font-weight:500; padding:8px 10px; text-align:left; }
 .ext-src-tbl td { padding:8px 10px; font-size:12px; border-bottom:1px solid var(--border-subtle); }
@@ -836,6 +847,26 @@ td[style*="position:sticky"] {
 .pv-tbl.daily-detail tr:nth-child(even):not(:last-child) td { background:rgba(255,255,255,.02); }
 .pv-tbl.daily-detail tr[data-day-idx]:hover td { background:rgba(75,131,240,.1) !important; }
 .pv-tbl.daily-detail tr.selected-row td { background:rgba(75,131,240,.18) !important; }
+
+/* 비용 상세 일별 테이블 */
+.pv-tbl.cd-daily { width:100%; border-collapse:separate; border-spacing:0; font-size:11px; white-space:nowrap; margin-bottom:40px; }
+.pv-tbl.cd-daily th, .pv-tbl.cd-daily td { border:none; border-right:1px solid var(--border-table); border-bottom:1px solid var(--border-table); padding:5px 8px; }
+.pv-tbl.cd-daily th:first-child, .pv-tbl.cd-daily td:first-child { border-left:1px solid var(--border-table); }
+.pv-tbl.cd-daily thead { position:sticky; top:0; z-index:10; }
+.pv-tbl.cd-daily thead th { background:var(--bg-elevated,#0f172a); }
+.pv-tbl.cd-daily .cd-grp th { font-size:11px; font-weight:700; padding:6px 8px; border-bottom:1px solid #334155; }
+.pv-tbl.cd-daily .cd-sub th { font-size:10px; font-weight:500; color:#94a3b8; padding:5px 8px; border-bottom:2px solid #334155; }
+.pv-tbl.cd-daily .cd-fix-day { position:sticky; left:0; z-index:5; background:var(--bg-elevated,#0f172a); min-width:32px; text-align:center; }
+.pv-tbl.cd-daily .cd-fix-dow { position:sticky; left:32px; z-index:5; background:var(--bg-elevated,#0f172a); min-width:36px; text-align:center; }
+.pv-tbl.cd-daily thead .cd-fix-day, .pv-tbl.cd-daily thead .cd-fix-dow { z-index:12; }
+.pv-tbl.cd-daily tbody tr:hover td { background:rgba(51,65,85,0.15); }
+.pv-tbl.cd-daily tbody tr:hover .cd-fix-day, .pv-tbl.cd-daily tbody tr:hover .cd-fix-dow { background:#1a2744; }
+.pv-tbl.cd-daily .cd-sum td { background:#1e293b; }
+.pv-tbl.cd-daily .cd-sum .cd-fix-day { background:#1e293b; }
+.pv-tbl.cd-daily td { font-size:11px; line-height:1.6; }
+.pv-tbl.cd-daily tr:nth-child(even):not(.cd-sum) td { background:rgba(255,255,255,.015); }
+.pv-tbl.cd-daily tr:nth-child(even):not(.cd-sum) .cd-fix-day,
+.pv-tbl.cd-daily tr:nth-child(even):not(.cd-sum) .cd-fix-dow { background:#101827; }
 
 /* 일 상세 모달 */
 .day-modal-overlay {
