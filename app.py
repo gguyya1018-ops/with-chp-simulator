@@ -154,19 +154,27 @@ class Api:
 
     # ─── 윈도우 제어 (frameless) ───
     _maximized = False
+    _prev_pos = None
+    _prev_size = None
 
     def win_minimize(self):
         window.minimize()
 
     def win_toggle_max(self):
         if self._maximized:
-            window.restore()
+            # 저장된 원래 크기/위치로 복원
+            if self._prev_pos and self._prev_size:
+                window.move(self._prev_pos[0], self._prev_pos[1])
+                window.resize(self._prev_size[0], self._prev_size[1])
+            else:
+                window.restore()
             self._maximized = False
         else:
+            # 현재 크기/위치 저장
+            self._prev_pos = (window.x, window.y)
+            self._prev_size = (window.width, window.height)
             # 작업표시줄을 제외한 작업영역 크기로 최대화
             try:
-                user32 = ctypes.windll.user32
-                # SPI_GETWORKAREA (48) → 작업표시줄 제외 영역
                 rect = ctypes.wintypes.RECT()
                 ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(rect), 0)
                 w = rect.right - rect.left
@@ -197,7 +205,7 @@ window = webview.create_window(
     '위드인천에너지 CHP 시뮬레이터',
     os.path.join(RESOURCE_DIR, 'index.html'),
     js_api=api, width=1440, height=920, min_size=(1000, 600),
-    background_color='#0a0a0a',
+    background_color='#0e0f12',
     frameless=True, easy_drag=False
 )
 

@@ -9,8 +9,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css?v=20260319e">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<!-- 3D Landing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 </head>
-<body style="background:#0a0a0a;">
+<body style="background:#0e0f12;">
 
 <!-- ═══════════════════════════════════════════════
      커스텀 타이틀바 (frameless 모드)
@@ -37,23 +41,43 @@
      메인 화면 (프로젝트 선택)
      ═══════════════════════════════════════════════ -->
 <div class="main-screen" id="mainScreen">
-<div class="main-box">
-    <div class="main-logo-area">
-        <img src="logo/with logo.png" alt="위드인천에너지" class="main-logo-img">
-        <span class="main-logo-text">위드인천에너지</span>
+<!-- Vanta.js 배경 -->
+<div id="landingBg" style="position:absolute;inset:0;z-index:0;overflow:hidden;">
+    <div id="vantaBg" style="width:100%;height:100%;"></div>
+</div>
+
+<!-- 상단 글로우 라인 -->
+<div class="landing-glow-top"></div>
+
+<div class="main-box" style="visibility:hidden">
+    <!-- 로고 + 뱃지 -->
+    <div class="landing-logo-area">
+        <div class="landing-logo-ring">
+            <img src="logo/with logo.png" alt="위드인천에너지" class="landing-logo-img">
+        </div>
+        <span class="landing-badge">위드인천에너지</span>
     </div>
-    <div class="main-title">CHP 보일러 기동계획 시뮬레이터</div>
-    <div class="main-sub">프로젝트를 선택하거나 새로 만드세요</div>
+
+    <!-- 타이틀 -->
+    <h1 class="landing-title">CHP 기동계획<br><span class="landing-title-accent">시뮬레이터</span></h1>
+    <p class="landing-sub">열병합 발전 운전 최적화 · MPC 기반 시뮬레이션</p>
+
+    <!-- 구분선 -->
+    <div class="landing-divider"></div>
+
+    <!-- 프로젝트 카드 -->
     <div class="main-actions">
         <!-- 기존 프로젝트 -->
-        <div class="main-card">
+        <div class="main-card glass-card">
+            <div class="card-icon">📂</div>
             <h3>프로젝트 열기</h3>
             <div class="project-list" id="projectList">
                 <p class="hint">프로젝트가 없습니다</p>
             </div>
         </div>
         <!-- 새 프로젝트 -->
-        <div class="main-card">
+        <div class="main-card glass-card">
+            <div class="card-icon">✨</div>
             <h3>새 프로젝트</h3>
             <label>프로젝트명
                 <input type="text" id="newProjectName" placeholder="예: 24년도위드">
@@ -64,6 +88,9 @@
             <button class="btn-primary" onclick="createProject()">생성</button>
         </div>
     </div>
+
+    <!-- 하단 버전 -->
+    <div class="landing-footer">v2.0 · MPC v8p8 · PLB v3</div>
 </div>
 </div>
 
@@ -493,10 +520,10 @@
                     <span>기본 보정</span>
                 </div>
                 <div class="edm-field">
-                    <span class="edm-label">대기전력 (최소)</span>
+                    <span class="edm-label">대기전력 (시간당)</span>
                     <div class="edm-input-wrap">
-                        <input type="text" id="standbyPowerKW" value="0" title="시간별 수요의 최소값 (이 값 아래로 내려가지 않음)">
-                        <span class="edm-unit">kW</span>
+                        <input type="text" id="standbyPowerKW" value="0" title="변압기 등 CHP 발전으로 커버 불가한 상시 외부 수전량 (kWh/h)">
+                        <span class="edm-unit">kWh/h</span>
                     </div>
                 </div>
                 <div class="edm-field">
@@ -580,7 +607,7 @@
                 <div class="edm-month-cell"><span>11월</span><input type="text" value="765"></div>
                 <div class="edm-month-cell"><span>12월</span><input type="text" value="4199"></div>
             </div>
-            <div style="font-size:10px;color:#64748b;margin-top:6px">단위: kW (시간당 평균 사용량). 예: 1000 = 매 시간 1,000kWh 소비</div>
+            <div style="font-size:10px;color:#64748b;margin-top:6px">단위: kWh/h (시간당 평균 사용량). 대기전력은 포함된 값. 예: 1000 = 매 시간 평균 1,000kWh 소비</div>
         </div>
 
         <div class="edm-monthly" style="margin-top:12px">
@@ -710,6 +737,7 @@
         <button class="inner-tab active" data-costtab="cv_self">자체열원</button>
         <button class="inner-tab" data-costtab="cv_ext">외부수열</button>
         <button class="inner-tab" data-costtab="cv_sales">열판매 수입</button>
+        <button class="inner-tab" data-costtab="cv_elec">전력수급</button>
         <button class="inner-tab" data-costtab="cv_summary">종합 손익</button>
     </div>
     <!-- 각 탭 공통: 고정 컨트롤 + 스크롤 테이블 -->
@@ -722,6 +750,9 @@
     </div>
     <div class="cost-panel" id="cv_sales">
         <div class="pv-body" id="pv_cv_sales"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
+    </div>
+    <div class="cost-panel" id="cv_elec">
+        <div class="pv-body" id="pv_cv_elec"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
     </div>
     <div class="cost-panel" id="cv_summary">
         <div class="pv-body" id="pv_cv_summary"><p class="hint">기동계획 실행 후 표시됩니다</p></div>
@@ -792,5 +823,81 @@
 })();
 </script>
 <script src="js/app.js"></script>
+
+<!-- ═══ Landing Vanta.js + Animation ═══ -->
+<script>
+(function(){
+    let vantaEffect = null;
+
+    function initLanding(){
+        const el = document.getElementById('vantaBg');
+        if(!el || typeof VANTA === 'undefined') return;
+        if(vantaEffect) return;
+        try {
+            vantaEffect = VANTA.NET({
+                el: el,
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200, minWidth: 200,
+                scale: 1.0, scaleMobile: 1.0,
+                color: 0x00b4a0,
+                backgroundColor: 0x0e0f12,
+                points: 8,
+                maxDistance: 20,
+                spacing: 18,
+                showDots: true
+            });
+        } catch(e){ console.warn('Vanta init error:', e); }
+    }
+
+    function runGSAP(){
+        var box = document.querySelector('.main-box');
+        if(!box) return;
+
+        if(typeof gsap === 'undefined'){
+            box.style.visibility = 'visible';
+            return;
+        }
+
+        // 초기 상태 설정
+        gsap.set('.landing-logo-ring', { scale:0, opacity:0 });
+        gsap.set('.landing-badge', { opacity:0, y:10 });
+        gsap.set('.landing-title', { opacity:0, y:20 });
+        gsap.set('.landing-sub', { opacity:0 });
+        gsap.set('.landing-divider', { opacity:0, scaleX:0 });
+        gsap.set('.main-actions', { opacity:0, y:20 });
+        gsap.set('.landing-footer', { opacity:0 });
+
+        // visible로 전환 (개별 요소는 opacity:0이라 안 보임)
+        box.style.visibility = 'visible';
+
+        // 순서대로 등장
+        var tl = gsap.timeline({ defaults:{ ease:'power3.out' }, delay:0.4 });
+        tl.to('.landing-logo-ring', { opacity:1, scale:1, duration:0.6 })
+          .to('.landing-badge', { opacity:1, y:0, duration:0.4 }, '-=0.1')
+          .to('.landing-title', { opacity:1, y:0, duration:0.5 }, '-=0.1')
+          .to('.landing-sub', { opacity:1, duration:0.4 }, '-=0.1')
+          .to('.landing-divider', { opacity:1, scaleX:1, duration:0.4 }, '-=0.1')
+          .to('.main-actions', { opacity:1, y:0, duration:0.5 }, '-=0.1')
+          .to('.landing-footer', { opacity:1, duration:0.3 }, '-=0.1');
+    }
+
+    const observer = new MutationObserver(function(){
+        const ms = document.getElementById('mainScreen');
+        if(!ms) return;
+        const visible = ms.style.display !== 'none';
+        if(visible && !vantaEffect){ initLanding(); runGSAP(); }
+        if(!visible && vantaEffect){ vantaEffect.destroy(); vantaEffect = null; }
+    });
+
+    window.addEventListener('DOMContentLoaded', function(){
+        const ms = document.getElementById('mainScreen');
+        if(ms) observer.observe(ms, { attributes:true, attributeFilter:['style'] });
+        initLanding();
+        runGSAP();
+    });
+})();
+</script>
 </body>
 </html>

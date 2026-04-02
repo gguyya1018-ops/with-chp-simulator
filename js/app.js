@@ -19,13 +19,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnMax = document.getElementById('tbMax');
     const btnClose = document.getElementById('tbClose');
     if (!btnMin) return;
-    btnMin.addEventListener('click', () => pywebview.api.win_minimize());
-    btnMax.addEventListener('click', () => pywebview.api.win_toggle_max());
-    btnClose.addEventListener('click', () => pywebview.api.win_close());
-    // 더블클릭으로 최대화 토글
-    document.querySelector('.titlebar-drag').addEventListener('dblclick', () => {
+    const svgMax = '<svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>';
+    const svgRestore = '<svg width="10" height="10" viewBox="0 0 10 10"><rect x="2.5" y="0.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><rect x="0.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/></svg>';
+    let isMaximized = false;
+    function toggleMax(){
         pywebview.api.win_toggle_max();
-    });
+        isMaximized = !isMaximized;
+        btnMax.innerHTML = isMaximized ? svgRestore : svgMax;
+    }
+    btnMin.addEventListener('click', () => pywebview.api.win_minimize());
+    btnMax.addEventListener('click', toggleMax);
+    btnClose.addEventListener('click', () => pywebview.api.win_close());
+    document.querySelector('.titlebar-drag').addEventListener('dblclick', toggleMax);
 });
 
 /* ═══════════════════════════════════════════════
@@ -176,8 +181,10 @@ function stripOperationsCols() {
    메인 화면 - 프로젝트 관리
    ═══════════════════════════════════════════════ */
 async function loadMainScreen() {
+    console.log('[loadMainScreen] called');
     // 프로젝트 목록
     const projects = await pywebview.api.list_projects();
+    console.log('[loadMainScreen] projects:', projects);
     const list = document.getElementById('projectList');
     if (!projects.length) {
         list.innerHTML = '<p class="hint">프로젝트가 없습니다</p>';
@@ -2738,7 +2745,7 @@ function runDailySimulation() {
         const chpNg = chpHours * selectedPerf.ngNm3;
         const selCost = d.loadCosts.find(c => c.load === chpLoadPct) || d.cost100;
         const chpFuelCost = Math.round(chpHours * selCost.ngCostH);
-        // 열제약매출: 시간별 MP × 송전MW × 1000 합산
+        // 전력매출: 시간별 MP × 송전MW × 1000 합산
         let chpElecRev = 0;
         hourly.forEach(hr => { if (hr.chp > 0) chpElecRev += hr.mp * selectedPerf.powerMW * 1000; });
         chpElecRev = Math.round(chpElecRev);
@@ -2858,7 +2865,7 @@ function solveDP() {
         const costs = perfOptions.map(p => {
             const ngCostH = d.ngCostNm3 * p.ngNm3;
             const elecRevH = mpAvg * p.powerMW * 1000;
-            return { load: p.load, heatRate: p.heatRate, netCostH: ngCostH - elecRevH, ngCostH, elecRevH, ngNm3: p.ngNm3, powerMW: p.powerMW };
+            return { load: p.load, heatRate: p.heatRate, netCostH: ngCostH - elecRevH, ngCostH, elecRevH, ngNm3: p.ngNm3, powerMW: p.powerMW, genMW: p.genMW || p.powerMW };
         });
         const plbCostPerGcal = (plbRef && plbRef.열Gcal > 0)
             ? (d.ngPLBNm3 * plbRef.ngNm3) / plbRef.열Gcal : Infinity;
@@ -3286,6 +3293,16 @@ async function solveMPCAsync(horizon, onProgress) {
                 dispatch.maxStorage = plbResult.maxStorage;
                 const plb = dispatch.plb;
 
+                // hourly에 발전량/사내소비 추가 (잠금 밖 보강)
+                const perf = decision.perf;
+                const genMW = perf?.genMW || perf?.powerMW || 0;
+                const chpHeatPerH = decision.chpHeatPerH || 1;
+                dispatch.hourly.forEach(hr => {
+                    const ratio = hr.chp > 0 ? (hr.chp / chpHeatPerH) : 0;
+                    hr.chpGenKWh = genMW * 1000 * ratio;          // 발전량
+                    hr.chpSelfKWh = hr.chpGenKWh - (hr.chpPowerKWh || 0); // 사내소비 = 발전 - 송전
+                });
+
                 const warns = _mpcValidate(ctx, today, block, dispatch);
                 if (warns.length > 0) ctx._warnings.push(...warns);
                 const result = _mpcSummarize(ctx, today, decision, block, plb, dispatch);
@@ -3380,7 +3397,7 @@ function solveMPCInit(horizon) {
         const costs = perfOptions.map(p => {
             const ngCostH = d.ngCostNm3 * p.ngNm3;
             const elecRevH = mpAvg * p.powerMW * 1000;
-            return { load: p.load, heatRate: p.heatRate, netCostH: ngCostH - elecRevH, ngCostH, elecRevH, ngNm3: p.ngNm3, powerMW: p.powerMW };
+            return { load: p.load, heatRate: p.heatRate, netCostH: ngCostH - elecRevH, ngCostH, elecRevH, ngNm3: p.ngNm3, powerMW: p.powerMW, genMW: p.genMW || p.powerMW };
         });
         const plbCostPerGcal = plbRef ? (d.ngPLBNm3 * plbRef.ngNm3) / plbRef.열Gcal : 99999;
         return { ...d, idx: i, costs, plbCostPerGcal };
@@ -3705,7 +3722,7 @@ function _mpcInit(horizon) {
 
     // 성능 옵션
     const perfOptions = chpLoadTable.filter(c => c.load >= chpMinLoad).map(c => ({
-        load: c.load, heatRate: c.열Gcal, powerMW: c.송전MW, ngNm3: c.ngNm3,
+        load: c.load, heatRate: c.열Gcal, powerMW: c.송전MW, genMW: c.발전MW, ngNm3: c.ngNm3,
     }));
     const plbRef     = plbTable.length > 0 ? plbTable[0] : null;
     const plb1DayCap = plbMaxCap * 24 * plbCount;
@@ -3720,7 +3737,7 @@ function _mpcInit(horizon) {
         const costs = perfOptions.map(p => {
             const ngCostH = d.ngCostNm3 * p.ngNm3;
             const elecRevH = mpAvg * p.powerMW * 1000;
-            return { load: p.load, heatRate: p.heatRate, netCostH: ngCostH - elecRevH, ngCostH, elecRevH, ngNm3: p.ngNm3, powerMW: p.powerMW };
+            return { load: p.load, heatRate: p.heatRate, netCostH: ngCostH - elecRevH, ngCostH, elecRevH, ngNm3: p.ngNm3, powerMW: p.powerMW, genMW: p.genMW || p.powerMW };
         });
         const plbCostPerGcal = plbRef ? (d.ngPLBNm3 * plbRef.ngNm3) / plbRef.열Gcal : 99999;
         return { ...d, idx: i, costs, plbCostPerGcal };
@@ -5643,7 +5660,7 @@ function renderContribution(simResults) {
 
     for (let m = 1; m <= 12; m++) {
         const b = monthly[m - 1];
-        // 전기판매 = 열제약매출 + 용량요금
+        // 전기판매 = 전력매출 + 용량요금
         const elecSales = (b.chpElecRev || 0) + (b.cpCharge || 0);
         // 열판매 = 기본료 + 사용요금(주택용+업무용+공공용+인테코판매)
         const heatSales = heatSalesMonthly ? (heatSalesMonthly[m]?.total || 0) : 0;
@@ -5806,7 +5823,8 @@ function renderContribution(simResults) {
 // ─── 전력수요 프로파일 구축 ───
 function buildElecDemandProfile() {
     // 공통 설정값
-    const standbyAdj = parseNum(document.getElementById('standbyPowerKW')?.value) || 0;
+    const standbyDaily = parseNum(document.getElementById('standbyPowerKW')?.value) || 0;
+    const standbyAdj = standbyDaily; // 시간당 값 그대로 사용
     const growthPct = parseNum(document.getElementById('demandGrowthPct')?.value) || 0;
     const growthFactor = 1 + growthPct / 100;
     const dayFactor = parseNum(document.getElementById('demandDayFactor')?.value) || 1.0;
@@ -5949,6 +5967,9 @@ function calcPlannedCapacity(simResults) {
     const monthly = {};
     for (let m = 1; m <= 12; m++) monthly[m] = { buyKwh: 0, sellKwh: 0, netKwh: 0 };
 
+    const standbyDaily = parseNum(document.getElementById('standbyPowerKW')?.value) || 0;
+    const standbyH = standbyDaily; // 시간당 값 그대로
+
     simResults.forEach(r => {
         const key = `${r.month}-${r.day}`;
         const demandH = profile.dailyProfile[key];
@@ -5957,7 +5978,10 @@ function calcPlannedCapacity(simResults) {
         const kwhH = Array(24).fill(0);
         let totalBuy = 0, totalSell = 0;
         for (let h = 0; h < 24; h++) {
-            const planned = demandH[h] - (r.hourly[h]?.chpPowerKWh || 0);
+            const chpOn = (r.hourly[h]?.chpGenKWh || 0) > 0;
+            // CHP 가동 시: 발전으로 건물 전력 커버 → 수전 = 대기전력만
+            // CHP 미가동 시: 수전 = 전력수요 전체 (DH설비+사무실+대기전력)
+            const planned = chpOn ? standbyH : demandH[h];
             kwhH[h] = planned;
             if (planned > 0) totalBuy += planned;
             else totalSell += Math.abs(planned);
@@ -5971,6 +5995,33 @@ function calcPlannedCapacity(simResults) {
     return { daily, monthly, profile };
 }
 
+// ─── 전력요금 단가 맵 빌더 (공용 유틸) ───
+function _buildElecRateMap(rateData) {
+    const rm = {}; for (let m = 1; m <= 12; m++) rm[m] = {};
+    if (!rateData || !rateData.rows) return rm;
+    rateData.rows.forEach(row => {
+        const h = Number(String(row[0]).replace('h', ''));
+        if (h < 1 || h > 24) return;
+        for (let m = 1; m <= 12; m++) rm[m][h] = Number(row[m]) || 0;
+    });
+    return rm;
+}
+
+function _getElecRateMaps() {
+    const rateWd = DATA.elec_rate_weekday;
+    const rateSat = DATA.elec_rate_saturday;
+    const rateHol = DATA.elec_rate_holiday;
+    const mapWd = _buildElecRateMap(rateWd);
+    const mapSat = _buildElecRateMap(rateSat);
+    const mapHol = _buildElecRateMap(rateHol);
+    function get(dayType) {
+        if (dayType === 'saturday' && rateSat?.rows?.length > 0) return mapSat;
+        if (dayType === 'holiday' && rateHol?.rows?.length > 0) return mapHol;
+        return mapWd;
+    }
+    return { mapWd, mapSat, mapHol, get };
+}
+
 // ─── 전력비 월별 집계 (공헌이익용) ───
 // options: { source: 'actual'|'planned', simResults }
 function calcElecCostMonthly(options = {}) {
@@ -5981,27 +6032,8 @@ function calcElecCostMonthly(options = {}) {
     if (!rateWd || !rateWd.rows || rateWd.rows.length === 0) return null;
     if (!bc || !bc.rows || bc.rows.length === 0) return null;
 
-    const rateSat = DATA.elec_rate_saturday;
-    const rateHol = DATA.elec_rate_holiday;
-
-    function buildRateMap(rd) {
-        const rm = {}; for (let m = 1; m <= 12; m++) rm[m] = {};
-        if (!rd || !rd.rows) return rm;
-        rd.rows.forEach(row => {
-            const h = Number(String(row[0]).replace('h', ''));
-            if (h < 1 || h > 24) return;
-            for (let m = 1; m <= 12; m++) rm[m][h] = Number(row[m]) || 0;
-        });
-        return rm;
-    }
-    const rateMapWd = buildRateMap(rateWd);
-    const rateMapSat = buildRateMap(rateSat);
-    const rateMapHol = buildRateMap(rateHol);
-    function getRateMap(dt) {
-        if (dt === 'saturday' && rateSat && rateSat.rows && rateSat.rows.length > 0) return rateMapSat;
-        if (dt === 'holiday' && rateHol && rateHol.rows && rateHol.rows.length > 0) return rateMapHol;
-        return rateMapWd;
-    }
+    const rateMaps = _getElecRateMaps();
+    const getRateMap = rateMaps.get;
 
     const bcMap = {};
     bc.rows.forEach(row => {
@@ -6705,7 +6737,7 @@ let _cvCurrentView = 'daily';
 
 function renderCostVerify(simResults) {
     if (!simResults || !simResults.length) {
-        ['pv_cv_self','pv_cv_ext','pv_cv_sales','pv_cv_summary'].forEach(id => {
+        ['pv_cv_self','pv_cv_ext','pv_cv_sales','pv_cv_summary','pv_cv_elec'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = '<p class="hint">기동계획 실행 후 표시됩니다</p>';
         });
@@ -6715,7 +6747,10 @@ function renderCostVerify(simResults) {
         simResults,
         monthly: aggregateMonthly(simResults),
         heatSales: calcHeatSalesMonthlyDetail(),
-        extHeat: calcExternalHeatMonthlyDetail()
+        extHeat: calcExternalHeatMonthlyDetail(),
+        profile: buildElecDemandProfile(),
+        planned: calcPlannedCapacity(simResults),
+        elecCost: calcElecCostMonthly({ source: 'planned', simResults }),
     };
     _cvRenderControls();
     _cvRenderCurrentTab();
@@ -6760,6 +6795,7 @@ function _cvRenderCurrentTab() {
     else if (tab === 'cv_ext') _cvRenderExt();
     else if (tab === 'cv_sales') _cvRenderSales();
     else if (tab === 'cv_summary') _cvRenderSummary();
+    else if (tab === 'cv_elec') _cvRenderElec();
 }
 
 // ── 공통 유틸 ──
@@ -6798,30 +6834,38 @@ function _cvRenderSelf() {
         for (let m = 1; m <= 12; m++) {
             const b = c.monthly[m - 1];
             let calcChp = 0, calcPlb = 0, calcElec = 0;
+            let genKwh = 0;
             c.simResults.filter(r => r.month === m).forEach(r => {
                 calcChp += Math.round((r.chpNg || 0) * (r.ngCostNm3 || 0));
                 calcPlb += Math.round((r.plbNg || 0) * (r.ngPLBNm3 || 0));
-                if (r.hourly) r.hourly.forEach(hr => { if (hr.chpPowerKWh > 0) calcElec += (hr.mp || 0) * hr.chpPowerKWh; });
+                if (r.hourly) r.hourly.forEach(hr => {
+                    if (hr.chpPowerKWh > 0) calcElec += (hr.mp || 0) * hr.chpPowerKWh;
+                    genKwh += hr.chpGenKWh || 0;
+                });
             });
             calcElec = Math.round(calcElec);
             const elecCost = elecM?.[m]?.total || 0;
+            const pm = c.planned?.monthly?.[m] || { buyKwh:0, sellKwh:0 };
             const wc = wcM?.[m] || { waterCost:0, chemTotal:0, total:0 };
             const net = b.chpFuelCost + b.startupCost + b.plbFuelCost + elecCost + wc.total - b.chpElecRev - b.cpCharge;
             data.push({ m, chpFuel: b.chpFuelCost, calcChp, startup: b.startupCost, chpHeat: b.chpHeat,
                 plbFuel: b.plbFuelCost, calcPlb, elecRev: b.chpElecRev, calcElec, cp: b.cpCharge,
-                elecCost, water: wc.waterCost, chem: wc.chemTotal, net });
+                genKwh, buyKwh: pm.buyKwh, elecCost, water: wc.waterCost, chem: wc.chemTotal, net });
         }
         let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
         html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
         html += `<th>CHP가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
         html += `<th>기동비<br><span style="color:#475569">(만원)</span></th><th>CHP열량<br><span style="color:#475569">(Gcal)</span></th>`;
         html += `<th>PLB가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
-        html += `<th style="color:#60a5fa">전력판매<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#60a5fa">발전<br><span style="color:#475569">(MWh)</span></th>`;
+        html += `<th style="color:#60a5fa">전력매출<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
         html += `<th style="color:#60a5fa">CP<br><span style="color:#475569">(만원)</span></th>`;
-        html += `<th>전력비<br><span style="color:#475569">(만원)</span></th><th>용수비<br><span style="color:#475569">(만원)</span></th><th>약품비<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#f87171">수전<br><span style="color:#475569">(MWh)</span></th>`;
+        html += `<th style="color:#f87171">전력비<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>용수비<br><span style="color:#475569">(만원)</span></th><th>약품비<br><span style="color:#475569">(만원)</span></th>`;
         html += `<th style="font-weight:700">순비용<br><span style="color:#475569">(만원)</span></th>`;
         html += '</tr></thead><tbody>';
-        const tot = { chpFuel:0, calcChp:0, startup:0, chpHeat:0, plbFuel:0, calcPlb:0, elecRev:0, calcElec:0, cp:0, elecCost:0, water:0, chem:0, net:0 };
+        const tot = { chpFuel:0, calcChp:0, startup:0, chpHeat:0, plbFuel:0, calcPlb:0, elecRev:0, calcElec:0, cp:0, genKwh:0, buyKwh:0, elecCost:0, water:0, chem:0, net:0 };
         data.forEach(d => {
             Object.keys(tot).forEach(k => tot[k] += d[k] || 0);
             const nc = d.net > 0 ? '#f87171' : '#4ade80';
@@ -6829,9 +6873,12 @@ function _cvRenderSelf() {
             html += `<td style="${R};color:${C}">${fmtW(d.chpFuel)}</td><td style="${V}">${chk(d.calcChp, d.chpFuel)}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(d.startup)}</td><td style="${R};color:${C}">${fmtQ(d.chpHeat)}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(d.plbFuel)}</td><td style="${V}">${chk(d.calcPlb, d.plbFuel)}</td>`;
+            html += `<td style="${R};color:#60a5fa">${Math.round(d.genKwh/1000).toLocaleString()}</td>`;
             html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(d.elecRev)}</td><td style="${V}">${chk(d.calcElec, d.elecRev)}</td>`;
             html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(d.cp)}</td>`;
-            html += `<td style="${R};color:${C}">${fmtW(d.elecCost)}</td><td style="${R};color:${C}">${fmtW(d.water)}</td><td style="${R};color:${C}">${fmtW(d.chem)}</td>`;
+            html += `<td style="${R};color:#f87171">${Math.round(d.buyKwh/1000).toLocaleString()}</td>`;
+            html += `<td style="${R};color:#f87171">${fmtW(d.elecCost)}</td>`;
+            html += `<td style="${R};color:${C}">${fmtW(d.water)}</td><td style="${R};color:${C}">${fmtW(d.chem)}</td>`;
             html += `<td style="${R};font-weight:700;color:${nc}">${fmtW(d.net)}</td></tr>`;
         });
         const tnc = tot.net > 0 ? '#f87171' : '#4ade80';
@@ -6839,9 +6886,12 @@ function _cvRenderSelf() {
         html += `<td style="${R};color:${C}">${fmtW(tot.chpFuel)}</td><td style="${V}">${chk(tot.calcChp, tot.chpFuel)}</td>`;
         html += `<td style="${R};color:${C}">${fmtW(tot.startup)}</td><td style="${R};color:${C}">${fmtQ(tot.chpHeat)}</td>`;
         html += `<td style="${R};color:${C}">${fmtW(tot.plbFuel)}</td><td style="${V}">${chk(tot.calcPlb, tot.plbFuel)}</td>`;
+        html += `<td style="${R};color:#60a5fa">${Math.round(tot.genKwh/1000).toLocaleString()}</td>`;
         html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(tot.elecRev)}</td><td style="${V}">${chk(tot.calcElec, tot.elecRev)}</td>`;
         html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(tot.cp)}</td>`;
-        html += `<td style="${R};color:${C}">${fmtW(tot.elecCost)}</td><td style="${R};color:${C}">${fmtW(tot.water)}</td><td style="${R};color:${C}">${fmtW(tot.chem)}</td>`;
+        html += `<td style="${R};color:#f87171">${Math.round(tot.buyKwh/1000).toLocaleString()}</td>`;
+        html += `<td style="${R};color:#f87171">${fmtW(tot.elecCost)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(tot.water)}</td><td style="${R};color:${C}">${fmtW(tot.chem)}</td>`;
         html += `<td style="${R};font-weight:800;color:${tnc}">${fmtW(tot.net)}</td></tr>`;
         html += '</tbody></table><div style="height:40px"></div>';
         el.innerHTML = html;
@@ -6874,17 +6924,25 @@ function _cvRenderSelf() {
             });
         }
 
-        // 전력비 월별 일할
-        let elecCostDaily = 0;
-        const plannedElec = typeof calcElecCostMonthly === 'function' ? calcElecCostMonthly({ source:'planned', simResults: c.simResults }) : null;
-        if (plannedElec?.[_cvCurrentMonth]) elecCostDaily = Math.round((plannedElec[_cvCurrentMonth].total || 0) / (days.length || 1));
+        // 전력비: 시간별 실제 계산 (전력수급과 동일)
+        const profile = c.profile;
+        const planned = c.planned;
+        const rateMaps = _getElecRateMaps();
+        const holidaySet2 = new Set();
+        if (DATA.holidays) DATA.holidays.rows.forEach(row => { if (Number(row[3]) === 1) holidaySet2.add(`${Number(row[0])}-${Number(row[1])}`); });
+        function _getDayType(m, d) {
+            const dow = new Date(CURRENT_YEAR, m - 1, d).getDay();
+            if (dow === 0 || holidaySet2.has(`${m}-${d}`)) return 'holiday';
+            if (dow === 6) return 'saturday';
+            return 'weekday';
+        }
 
         let html = '<table class="pv-tbl cd-daily"><thead>';
         html += '<tr class="cd-grp"><th class="cd-fix-day">&nbsp;</th><th class="cd-fix-dow">&nbsp;</th>';
         html += '<th colspan="6" style="color:#67e8f9">CHP</th>';
         html += '<th colspan="4" style="color:#6ee7b7">PLB</th>';
-        html += '<th colspan="4" style="color:#60a5fa">전력</th>';
-        html += '<th colspan="3" style="color:#f59e0b">기타비용</th>';
+        html += '<th colspan="7" style="color:#60a5fa">전력수급</th>';
+        html += '<th colspan="2" style="color:#f59e0b">기타비용</th>';
         html += '<th>&nbsp;</th></tr>';
         html += '<tr class="cd-sub"><th class="cd-fix-day">일</th><th class="cd-fix-dow">요일</th>';
         html += `<th>수량<br><span style="color:#475569">(Nm³)</span></th><th>단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
@@ -6892,12 +6950,14 @@ function _cvRenderSelf() {
         html += `<th>기동비<br><span style="color:#475569">(만원)</span></th><th>열량<br><span style="color:#475569">(Gcal)</span></th>`;
         html += `<th>수량<br><span style="color:#475569">(Nm³)</span></th><th>단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
         html += `<th>가스비<br><span style="color:#475569">(만원)</span></th><th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
-        html += `<th>발전<br><span style="color:#475569">(MWh)</span></th><th>판매액<br><span style="color:#475569">(만원)</span></th>`;
-        html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th><th>CP<br><span style="color:#475569">(만원)</span></th>`;
-        html += `<th>전력비<br><span style="color:#475569">(만원)</span></th><th>용수비<br><span style="color:#475569">(만원)</span></th><th>약품비<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#60a5fa">발전<br><span style="color:#475569">(MWh)</span></th><th>송전<br><span style="color:#475569">(MWh)</span></th><th style="color:#60a5fa">전력매출<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#60a5fa">CP<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th style="color:#f87171">수전<br><span style="color:#475569">(MWh)</span></th><th style="color:#f87171">전력비<br><span style="color:#475569">(만원)</span></th>`;
+        html += `<th>용수비<br><span style="color:#475569">(만원)</span></th><th>약품비<br><span style="color:#475569">(만원)</span></th>`;
         html += `<th style="font-weight:700">순비용<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>`;
 
-        const sums = { chpNg:0, chpFuel:0, calcChp:0, startup:0, chpHeat:0, plbNg:0, plbFuel:0, calcPlb:0, elecMWh:0, elecRev:0, calcElec:0, cp:0, net:0 };
+        const sums = { chpNg:0, chpFuel:0, calcChp:0, startup:0, chpHeat:0, plbNg:0, plbFuel:0, calcPlb:0, elecMWh:0, elecRev:0, calcElec:0, cp:0, buyKwh:0, elecCost:0, water:0, chem:0, gridCost:0, net:0 };
         days.forEach(r => {
             const chpCalc = Math.round((r.chpNg||0) * (r.ngCostNm3||0));
             const plbCalc = Math.round((r.plbNg||0) * (r.ngPLBNm3||0));
@@ -6906,29 +6966,49 @@ function _cvRenderSelf() {
             elecCalc = Math.round(elecCalc);
             const dayCP = (r.isWeekend || r.isHoliday) ? cpHol : cpWd;
             const wc = wcDaily[r.day] || { water:0, chem:0, total:0 };
-            const net = (r.chpFuelCost||0) + (r.startupCost||0) + (r.plbFuelCost||0) + elecCostDaily + wc.total - (r.chpElecRev||0) - dayCP;
+            // 전력비: 시간별 실제 계산 (전력수급과 동일)
+            const key = `${r.month}-${r.day}`;
+            const pd = planned?.daily?.[key];
+            const demandH = profile?.dailyProfile?.[key];
+            let dayBuyKwh = 0, dayElecCost = 0;
+            if (pd && demandH) {
+                const dt = _getDayType(r.month, r.day);
+                const rm = rateMaps.get(dt);
+                for (let h = 0; h < 24; h++) {
+                    const bk = Math.max(0, pd.kwhH[h]);
+                    dayBuyKwh += bk;
+                    dayElecCost += bk * (rm[r.month]?.[h+1] || 0);
+                }
+            }
+            dayElecCost = Math.round(dayElecCost);
+            const net = (r.chpFuelCost||0) + (r.startupCost||0) + (r.plbFuelCost||0) + dayElecCost + wc.total - (r.chpElecRev||0) - dayCP;
             sums.chpNg += r.chpNg||0; sums.chpFuel += r.chpFuelCost||0; sums.calcChp += chpCalc;
             sums.startup += r.startupCost||0; sums.chpHeat += r.chpHeat||0;
             sums.plbNg += r.plbNg||0; sums.plbFuel += r.plbFuelCost||0; sums.calcPlb += plbCalc;
+            const dayGenKwh = r.hourly.reduce((s, h) => s + (h.chpGenKWh || 0), 0);
+            sums.genKwh = (sums.genKwh||0) + dayGenKwh;
             sums.elecMWh += r.chpPower||0; sums.elecRev += r.chpElecRev||0; sums.calcElec += elecCalc;
-            sums.cp += dayCP; sums.elecCost = (sums.elecCost||0) + elecCostDaily;
-            sums.water = (sums.water||0) + wc.water; sums.chem = (sums.chem||0) + wc.chem;
-            sums.net += net;
+            sums.cp += dayCP; sums.buyKwh += dayBuyKwh; sums.elecCost += dayElecCost;
+            sums.water += wc.water; sums.chem += wc.chem;
+            sums.gridCost += dayElecCost; sums.net += net;
 
             const dowColor = r.isWeekend||r.isHoliday ? '#f87171' : r.isMaint ? '#a78bfa' : '#94a3b8';
             const nc = net > 0 ? '#f87171' : net < 0 ? '#4ade80' : '#64748b';
-            html += `<tr><td class="cd-fix-day" style="font-weight:600;color:#e2e8f0">${r.day}</td>`;
+            html += `<tr style="cursor:pointer" onclick="_showElecDayModal(${r.month},${r.day})">`;
+            html += `<td class="cd-fix-day" style="font-weight:600;color:#93c5fd">${r.day}</td>`;
             html += `<td class="cd-fix-dow" style="color:${dowColor}">${r.dowName}</td>`;
             html += `<td style="${R};color:${C}">${fmtN(r.chpNg)}</td><td style="${R};color:${C}">${fmtN(r.ngCostNm3)}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(r.chpFuelCost)}</td><td style="${V}">${r.chpNg > 0 ? chk(chpCalc, r.chpFuelCost||0) : '-'}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(r.startupCost)}</td><td style="${R};color:${C}">${fmtQ(r.chpHeat)}</td>`;
             html += `<td style="${R};color:${C}">${fmtN(r.plbNg)}</td><td style="${R};color:${C}">${fmtN(r.ngPLBNm3)}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(r.plbFuelCost)}</td><td style="${V}">${r.plbNg > 0 ? chk(plbCalc, r.plbFuelCost||0) : '-'}</td>`;
+            html += `<td style="${R};color:#60a5fa">${dayGenKwh > 0 ? (dayGenKwh/1000).toFixed(1) : '-'}</td>`;
             html += `<td style="${R};color:${C}">${r.chpPower > 0 ? r.chpPower.toFixed(1) : '-'}</td>`;
             html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(r.chpElecRev)}</td>`;
             html += `<td style="${V}">${r.chpPower > 0 ? chk(elecCalc, r.chpElecRev||0) : '-'}</td>`;
             html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(dayCP)}</td>`;
-            html += `<td style="${R};color:${C}">${fmtW(elecCostDaily)}</td>`;
+            html += `<td style="${R};color:#f87171">${dayBuyKwh > 0 ? (dayBuyKwh/1000).toFixed(1) : '-'}</td>`;
+            html += `<td style="${R};color:#f87171">${fmtW(dayElecCost)}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(wc.water)}</td>`;
             html += `<td style="${R};color:${C}">${fmtW(wc.chem)}</td>`;
             html += `<td style="${R};font-weight:700;color:${nc}">${fmtW(net)}</td></tr>`;
@@ -6940,12 +7020,14 @@ function _cvRenderSelf() {
         html += `<td style="${R};color:${C}">${fmtW(sums.startup)}</td><td style="${R};color:${C}">${fmtQ(sums.chpHeat)}</td>`;
         html += `<td style="${R};color:${C}">${fmtN(sums.plbNg)}</td><td style="${R}">-</td>`;
         html += `<td style="${R};color:${C}">${fmtW(sums.plbFuel)}</td><td style="${V}">${chk(sums.calcPlb, sums.plbFuel)}</td>`;
+        html += `<td style="${R};color:#60a5fa">${((sums.genKwh||0)/1000).toFixed(1)}</td>`;
         html += `<td style="${R};color:${C}">${sums.elecMWh.toFixed(1)}</td>`;
         html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(sums.elecRev)}</td><td style="${V}">${chk(sums.calcElec, sums.elecRev)}</td>`;
         html += `<td style="${R};color:#60a5fa;font-weight:600">${fmtW(sums.cp)}</td>`;
-        html += `<td style="${R};color:${C}">${fmtW(sums.elecCost||0)}</td>`;
-        html += `<td style="${R};color:${C}">${fmtW(sums.water||0)}</td>`;
-        html += `<td style="${R};color:${C}">${fmtW(sums.chem||0)}</td>`;
+        html += `<td style="${R};color:#f87171">${(sums.buyKwh/1000).toFixed(1)}</td>`;
+        html += `<td style="${R};color:#f87171">${fmtW(sums.elecCost)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.water)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(sums.chem)}</td>`;
         html += `<td style="${R};font-weight:800;color:${snc}">${fmtW(sums.net)}</td></tr>`;
         html += '</tbody></table><div style="height:40px"></div>';
         el.innerHTML = html;
@@ -7173,19 +7255,146 @@ function _cvRenderSummary() {
     const { fmtW, C, R } = _cvFmt();
     const hs = c.heatSales;
     const ext = c.extHeat;
+    const wcM = calcWaterChemMonthly();
+    const elecM = typeof calcElecCostMonthly === 'function' ? calcElecCostMonthly({ source:'planned', simResults: c.simResults }) : null;
 
-    let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
+    if (_cvCurrentView === 'daily') {
+        // ── 일별 종합손익 ──
+        const days = c.simResults.filter(r => r.month === _cvCurrentMonth);
+        const planned = c.planned;
+        const profile = c.profile;
+        const rateMaps = _getElecRateMaps();
+        const holidaySet3 = new Set();
+        if (DATA.holidays) DATA.holidays.rows.forEach(row => { if (Number(row[3]) === 1) holidaySet3.add(`${Number(row[0])}-${Number(row[1])}`); });
+        function _getDT(m, d) {
+            const dow = new Date(CURRENT_YEAR, m - 1, d).getDay();
+            if (dow === 0 || holidaySet3.has(`${m}-${d}`)) return 'holiday';
+            if (dow === 6) return 'saturday';
+            return 'weekday';
+        }
+        let cpWd = 0, cpHol = 0;
+        if (DATA.cp_monthly) {
+            const cpH = DATA.cp_monthly.headers;
+            DATA.cp_monthly.rows.forEach(row => {
+                if (Number(row[0]) === _cvCurrentMonth) {
+                    cpWd = Number(row[cpH.indexOf('평일CP')]) || 0;
+                    cpHol = Number(row[cpH.indexOf('휴일CP')]) || 0;
+                }
+            });
+        }
+        // 용수약품 일별
+        const wcDaily = {};
+        if (DATA.water_chem_daily && DATA.water_price_monthly && DATA.chem_price_monthly) {
+            const wpMap = {}, cpMap3 = {};
+            DATA.water_price_monthly.rows.forEach(r => { wpMap[Number(r[0])] = parseNum(r[3]) || parseNum(r[2]) || 0; });
+            DATA.chem_price_monthly.rows.forEach(r => { const m2 = Number(r[0]); cpMap3[m2] = { a:parseNum(r[1]),b:parseNum(r[2]),c:parseNum(r[3]),d:parseNum(r[4]),e:parseNum(r[5]),f:parseNum(r[6]) }; });
+            DATA.water_chem_daily.rows.forEach(row => {
+                const m2 = Number(row[0]), d2 = Number(row[1]); if (m2 !== _cvCurrentMonth) return;
+                const wq = parseNum(row[2]), wc2 = Math.round(wq * (wpMap[m2]||0));
+                const cp3 = cpMap3[m2] || {};
+                let chemT = 0; [cp3.a,cp3.b,cp3.c,cp3.d,cp3.e,cp3.f].forEach((p,i) => { chemT += Math.round(parseNum(row[i+3]) * (p||0)); });
+                wcDaily[d2] = { water: wc2, chem: chemT };
+            });
+        }
+        // 열판매 일별 (월별÷일수로 균등분배)
+        const daysInMonth = days.length || 1;
+        const mSales = hs ? hs[_cvCurrentMonth]?.total || 0 : 0;
+        const dailySales = Math.round(mSales / daysInMonth);
+        // 외부수열 일별
+        const mExt = ext ? ext.cost[_cvCurrentMonth]?._total || 0 : 0;
+        const dailyExt = Math.round(mExt / daysInMonth);
+
+        var html = '<table class="pv-tbl cd-daily"><thead>';
+        html += '<tr class="cd-grp"><th class="cd-fix-day">&nbsp;</th><th class="cd-fix-dow">&nbsp;</th>';
+        html += '<th colspan="3" style="color:#60a5fa">수입</th>';
+        html += '<th colspan="5" style="color:#f87171">지출</th>';
+        html += '<th colspan="2">&nbsp;</th></tr>';
+        html += '<tr class="cd-sub"><th class="cd-fix-day">일</th><th class="cd-fix-dow">요일</th>';
+        html += '<th style="color:#60a5fa">열판매<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#60a5fa">전력매출<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#60a5fa">CP<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#f87171">자체열원<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#f87171">외부수열<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#f87171">전력비<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#f87171">용수비<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#f87171">약품비<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="color:#60a5fa;font-weight:700">수입합계<br><span style="color:#475569">(만원)</span></th>';
+        html += '<th style="font-weight:800">공헌이익<br><span style="color:#475569">(만원)</span></th></tr></thead><tbody>';
+
+        var sums = { sales:0, elecRev:0, cp:0, self:0, ext:0, elecCost:0, water:0, chem:0, revT:0, profit:0 };
+        days.forEach(function(r) {
+            var dayCP = (r.isWeekend || r.isHoliday) ? cpHol : cpWd;
+            var selfCost = (r.chpFuelCost||0) + (r.startupCost||0) + (r.plbFuelCost||0);
+            var wc = wcDaily[r.day] || { water:0, chem:0 };
+            var dayElecCost = 0;
+            var sKey = r.month + '-' + r.day;
+            var pd = planned && planned.daily ? planned.daily[sKey] : null;
+            var demandH = profile && profile.dailyProfile ? profile.dailyProfile[sKey] : null;
+            if (pd && demandH) {
+                var dt = _getDT(r.month, r.day);
+                var rm = rateMaps.get(dt);
+                for (var h = 0; h < 24; h++) {
+                    dayElecCost += Math.max(0, pd.kwhH[h]) * ((rm[r.month] && rm[r.month][h+1]) || 0);
+                }
+            }
+            dayElecCost = Math.round(dayElecCost);
+            var revT = dailySales + (r.chpElecRev||0) + dayCP;
+            var costT = selfCost + dailyExt + dayElecCost + wc.water + wc.chem;
+            var profit = revT - costT;
+            sums.sales += dailySales; sums.elecRev += r.chpElecRev||0; sums.cp += dayCP;
+            sums.self += selfCost; sums.ext += dailyExt; sums.elecCost += dayElecCost;
+            sums.water += wc.water; sums.chem += wc.chem; sums.revT += revT; sums.profit += profit;
+
+            var dowColor = r.isWeekend||r.isHoliday ? '#f87171' : '#94a3b8';
+            var pc = profit >= 0 ? '#4ade80' : '#f87171';
+            html += '<tr>';
+            html += '<td class="cd-fix-day" style="font-weight:600;color:#93c5fd">' + r.day + '</td>';
+            html += '<td class="cd-fix-dow" style="color:' + dowColor + '">' + r.dowName + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(dailySales) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(r.chpElecRev) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(dayCP) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(selfCost) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(dailyExt) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(dayElecCost) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(wc.water) + '</td>';
+            html += '<td style="' + R + ';color:' + C + '">' + fmtW(wc.chem) + '</td>';
+            html += '<td style="' + R + ';font-weight:700;color:#60a5fa">' + fmtW(revT) + '</td>';
+            html += '<td style="' + R + ';font-weight:700;color:' + pc + '">' + fmtW(profit) + '</td></tr>';
+        });
+        var tpc2 = sums.profit >= 0 ? '#4ade80' : '#f87171';
+        html += '<tr class="cd-sum" style="font-weight:700;border-top:2px solid #334155"><td class="cd-fix-day" style="color:#e2e8f0" colspan="2">합계</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.sales) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.elecRev) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.cp) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.self) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.ext) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.elecCost) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.water) + '</td>';
+        html += '<td style="' + R + ';color:' + C + '">' + fmtW(sums.chem) + '</td>';
+        html += '<td style="' + R + ';font-weight:800;color:#60a5fa">' + fmtW(sums.revT) + '</td>';
+        html += '<td style="' + R + ';font-weight:800;color:' + tpc2 + '">' + fmtW(sums.profit) + '</td></tr>';
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+        _setupAutoScroll(el);
+        return;
+    }
+
+    // ── 월별 종합손익 ──
+    var html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
     html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
     html += `<th style="color:#60a5fa">열판매수입<br><span style="color:#475569">(만원)</span></th>`;
-    html += `<th style="color:#60a5fa">전력판매<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#60a5fa">전력매출<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="color:#60a5fa">CP<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="color:#60a5fa;font-weight:700">수입합계<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="color:#f87171">자체열원비<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="color:#f87171">외부수열비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#f87171">전력비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#f87171">용수비<br><span style="color:#475569">(만원)</span></th>`;
+    html += `<th style="color:#f87171">약품비<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="color:#f87171;font-weight:700">지출합계<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="font-weight:800">공헌이익<br><span style="color:#475569">(만원)</span></th>`;
     html += '</tr></thead><tbody>';
-    const tot = { sales:0, elec:0, cp:0, revT:0, self:0, ext:0, costT:0, profit:0 };
+    const tot = { sales:0, elec:0, cp:0, revT:0, self:0, ext:0, elecCost:0, water:0, chem:0, costT:0, profit:0 };
     for (let m = 1; m <= 12; m++) {
         const b = c.monthly[m-1];
         const sales = hs ? hs[m]?.total || 0 : 0;
@@ -7194,15 +7403,21 @@ function _cvRenderSummary() {
         const revT = sales + elec + cp;
         const selfCost = b.chpFuelCost + b.startupCost + b.plbFuelCost;
         const extCost = ext ? ext.cost[m]?._total || 0 : 0;
-        const costT = selfCost + extCost;
+        const elecCost = elecM?.[m]?.total || 0;
+        const wc = wcM?.[m] || { waterCost:0, chemTotal:0 };
+        const costT = selfCost + extCost + elecCost + wc.waterCost + wc.chemTotal;
         const profit = revT - costT;
         tot.sales += sales; tot.elec += elec; tot.cp += cp; tot.revT += revT;
-        tot.self += selfCost; tot.ext += extCost; tot.costT += costT; tot.profit += profit;
+        tot.self += selfCost; tot.ext += extCost; tot.elecCost += elecCost;
+        tot.water += wc.waterCost; tot.chem += wc.chemTotal;
+        tot.costT += costT; tot.profit += profit;
         const pc = profit >= 0 ? '#4ade80' : '#f87171';
         html += `<tr><td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${m}월</td>`;
         html += `<td style="${R};color:${C}">${fmtW(sales)}</td><td style="${R};color:${C}">${fmtW(elec)}</td><td style="${R};color:${C}">${fmtW(cp)}</td>`;
         html += `<td style="${R};font-weight:700;color:#60a5fa">${fmtW(revT)}</td>`;
         html += `<td style="${R};color:${C}">${fmtW(selfCost)}</td><td style="${R};color:${C}">${fmtW(extCost)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(elecCost)}</td>`;
+        html += `<td style="${R};color:${C}">${fmtW(wc.waterCost)}</td><td style="${R};color:${C}">${fmtW(wc.chemTotal)}</td>`;
         html += `<td style="${R};font-weight:700;color:#f87171">${fmtW(costT)}</td>`;
         html += `<td style="${R};font-weight:700;color:${pc}">${fmtW(profit)}</td></tr>`;
     }
@@ -7211,10 +7426,256 @@ function _cvRenderSummary() {
     html += `<td style="${R};color:${C}">${fmtW(tot.sales)}</td><td style="${R};color:${C}">${fmtW(tot.elec)}</td><td style="${R};color:${C}">${fmtW(tot.cp)}</td>`;
     html += `<td style="${R};font-weight:800;color:#60a5fa">${fmtW(tot.revT)}</td>`;
     html += `<td style="${R};color:${C}">${fmtW(tot.self)}</td><td style="${R};color:${C}">${fmtW(tot.ext)}</td>`;
+    html += `<td style="${R};color:${C}">${fmtW(tot.elecCost)}</td>`;
+    html += `<td style="${R};color:${C}">${fmtW(tot.water)}</td><td style="${R};color:${C}">${fmtW(tot.chem)}</td>`;
     html += `<td style="${R};font-weight:800;color:#f87171">${fmtW(tot.costT)}</td>`;
     html += `<td style="${R};font-weight:800;color:${tpc}">${fmtW(tot.profit)}</td></tr>`;
     html += '</tbody></table><div style="height:40px"></div>';
     el.innerHTML = html;
+}
+
+// ══════════════════════════════════════
+//  전력수급 탭
+// ══════════════════════════════════════
+function _cvRenderElec() {
+    const el = document.getElementById('pv_cv_elec');
+    if (!el || !_cvCache) return;
+    const c = _cvCache;
+    const { fmtW, C, R } = _cvFmt();
+    const planned = c.planned;
+
+    if (!planned || !c.profile) {
+        el.innerHTML = '<p class="hint">전력수요 설정 후 시뮬을 실행하세요 (설정 > 전력수요 모델링)</p>';
+        return;
+    }
+
+    const fMWh = v => v === 0 ? '-' : (v / 1000).toFixed(1);
+
+    if (_cvCurrentView === 'monthly') {
+        // ── 월별: 발전/송전/수전 ──
+        const data = [];
+        for (let m = 1; m <= 12; m++) {
+            const pm = planned.monthly[m] || { buyKwh: 0 };
+            let genKwh = 0, sendKwh = 0;
+            c.simResults.filter(r => r.month === m).forEach(r => {
+                r.hourly.forEach(h => { genKwh += h.chpGenKWh || 0; sendKwh += h.chpPowerKWh || 0; });
+            });
+            data.push({ m, gen: genKwh, send: sendKwh, buy: pm.buyKwh });
+        }
+        let html = '<table class="pv-tbl" style="font-size:11px;white-space:nowrap;width:auto"><thead><tr>';
+        html += '<th style="position:sticky;left:0;background:#0f172a;z-index:2">월</th>';
+        html += '<th style="color:#60a5fa">발전<br><span style="color:#475569">(MWh)</span></th>';
+        html += '<th style="color:#4ade80">송전<br><span style="color:#475569">(MWh)</span></th>';
+        html += '<th style="color:#f87171">수전<br><span style="color:#475569">(MWh)</span></th>';
+        html += '</tr></thead><tbody>';
+        const tot = { gen:0, send:0, buy:0 };
+        data.forEach(d => {
+            tot.gen += d.gen; tot.send += d.send; tot.buy += d.buy;
+            html += `<tr><td style="position:sticky;left:0;background:#0f172a;z-index:1;font-weight:700;color:#e2e8f0;text-align:center">${d.m}월</td>`;
+            html += `<td style="${R};color:#60a5fa">${fMWh(d.gen)}</td>`;
+            html += `<td style="${R};color:#4ade80">${fMWh(d.send)}</td>`;
+            html += `<td style="${R};color:#f87171">${fMWh(d.buy)}</td></tr>`;
+        });
+        html += `<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b"><td style="position:sticky;left:0;background:#1e293b;z-index:1;color:#e2e8f0;text-align:center">합계</td>`;
+        html += `<td style="${R};color:#60a5fa">${fMWh(tot.gen)}</td>`;
+        html += `<td style="${R};color:#4ade80">${fMWh(tot.send)}</td>`;
+        html += `<td style="${R};color:#f87171">${fMWh(tot.buy)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        el.innerHTML = html;
+    } else {
+        // ── 일별: 발전/송전/수전 ──
+        const days = c.simResults.filter(r => r.month === _cvCurrentMonth);
+
+        let html = '<table class="pv-tbl cd-daily" style="width:auto"><thead>';
+        html += '<tr class="cd-sub"><th class="cd-fix-day">일</th><th class="cd-fix-dow">요일</th>';
+        html += '<th style="color:#60a5fa">발전<br><span style="color:#475569">(MWh)</span></th>';
+        html += '<th style="color:#4ade80">송전<br><span style="color:#475569">(MWh)</span></th>';
+        html += '<th style="color:#f87171">수전<br><span style="color:#475569">(MWh)</span></th>';
+        html += '</tr></thead><tbody>';
+
+        const sums = { gen:0, send:0, buy:0 };
+        days.forEach(r => {
+            const key = `${r.month}-${r.day}`;
+            const pd = planned.daily[key];
+            const dayGen = r.hourly.reduce((s, h) => s + (h.chpGenKWh || 0), 0);
+            const daySend = r.hourly.reduce((s, h) => s + (h.chpPowerKWh || 0), 0);
+            const dayBuy = pd ? pd.buyKwh : 0;
+            sums.gen += dayGen; sums.send += daySend; sums.buy += dayBuy;
+
+            const dowColor = r.isWeekend || r.isHoliday ? '#f87171' : r.isMaint ? '#a78bfa' : '#94a3b8';
+            html += `<tr style="cursor:pointer" onclick="_showElecDayModal(${r.month},${r.day})">`;
+            html += `<td class="cd-fix-day" style="font-weight:600;color:#93c5fd">${r.day}</td>`;
+            html += `<td class="cd-fix-dow" style="color:${dowColor}">${r.dowName}</td>`;
+            html += `<td style="${R};color:#60a5fa">${fMWh(dayGen)}</td>`;
+            html += `<td style="${R};color:#4ade80">${fMWh(daySend)}</td>`;
+            html += `<td style="${R};color:#f87171">${fMWh(dayBuy)}</td></tr>`;
+        });
+        html += `<tr class="cd-sum" style="font-weight:700;border-top:2px solid #334155"><td class="cd-fix-day" style="color:#e2e8f0" colspan="2">합계</td>`;
+        html += `<td style="${R};color:#60a5fa">${fMWh(sums.gen)}</td>`;
+        html += `<td style="${R};color:#4ade80">${fMWh(sums.send)}</td>`;
+        html += `<td style="${R};color:#f87171">${fMWh(sums.buy)}</td></tr>`;
+        html += '</tbody></table><div style="height:40px"></div>';
+        html += '<p style="font-size:10px;color:#64748b;margin-top:-30px">행을 클릭하면 시간별 전력수급 상세를 볼 수 있습니다</p>';
+        el.innerHTML = html;
+    }
+}
+
+// ── 전력수급 시간별 모달 ──
+function _showElecDayModal(month, day) {
+    const c = _cvCache;
+    if (!c) return;
+    const r = c.simResults.find(s => s.month === month && s.day === day);
+    if (!r) return;
+    const key = `${month}-${day}`;
+    const demandH = c.profile?.dailyProfile?.[key];
+    const pd = c.planned?.daily?.[key];
+    if (!demandH || !pd) return;
+
+    const rateMaps = _getElecRateMaps();
+    const holidaySet = new Set();
+    if (DATA.holidays) DATA.holidays.rows.forEach(row => { if (Number(row[3]) === 1) holidaySet.add(`${Number(row[0])}-${Number(row[1])}`); });
+    const dow = new Date(CURRENT_YEAR, month - 1, day).getDay();
+    const dt = (dow === 0 || holidaySet.has(key)) ? 'holiday' : dow === 6 ? 'saturday' : 'weekday';
+    const rateMap = rateMaps.get(dt);
+
+    // 시간별 데이터 구성
+    const standbyDaily = parseNum(document.getElementById('standbyPowerKW')?.value) || 0;
+    const standbyH = standbyDaily; // 시간당 값 그대로
+    const hours = [];
+    let tDemand = 0, tGenTotal = 0, tSend = 0, tSelf = 0, tBuy = 0, tBuyCost = 0, tSellRev = 0;
+    for (let h = 0; h < 24; h++) {
+        const demand = demandH[h] || 0;
+        const genTotal = r.hourly[h]?.chpGenKWh || 0;   // 발전량
+        const send = r.hourly[h]?.chpPowerKWh || 0;     // 송전량
+        const selfUse = genTotal - send;                  // 사내소비
+        // CHP 가동 시: 발전으로 건물 전력 커버 → 수전 = 대기전력만
+        // CHP 미가동 시: 수전 = 전력수요 전체
+        const buy = genTotal > 0 ? standbyH : demand;
+        const rate = rateMap[month]?.[h + 1] || 0;
+        const mp = r.hourly[h]?.mp || 0;
+        const buyCost = Math.round(buy * rate);
+        const sellRev = Math.round(send * mp);
+        hours.push({ h, demand, genTotal, send, selfUse, buy, standbyH, rate, mp, buyCost, sellRev, net: buyCost - sellRev });
+        tDemand += demand; tGenTotal += genTotal; tSend += send; tSelf += selfUse; tBuy += buy; tBuyCost += buyCost; tSellRev += sellRev;
+    }
+
+    // 모달 생성
+    const old = document.getElementById('elecDayModal');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'elecDayModal';
+    overlay.className = 'day-modal-overlay';
+
+    const fN = v => Math.round(v).toLocaleString();
+    const fW = v => Math.round(v / 10000).toLocaleString();
+    const dowNames = ['일','월','화','수','목','금','토'];
+    const dowName = dowNames[dow];
+
+    let html = '<div class="day-modal-box" style="max-width:1100px">';
+    // 헤더
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+    html += `<div style="font-size:16px;font-weight:800;color:#e2e8f0">${month}/${day} (${dowName}) 전력수급 상세</div>`;
+    html += '<div style="display:flex;gap:8px;align-items:center">';
+    html += `<button class="cd-tab active" data-elecview="chart" onclick="_switchElecView('chart')">그래프</button>`;
+    html += `<button class="cd-tab" data-elecview="data" onclick="_switchElecView('data')">데이터</button>`;
+    html += `<button onclick="document.getElementById('elecDayModal').remove()" style="border:none;background:rgba(51,65,85,0.4);width:32px;height:32px;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:16px" onmouseenter="this.style.background='rgba(239,68,68,0.3)'" onmouseleave="this.style.background='rgba(51,65,85,0.4)'">\u2715</button>`;
+    html += '</div></div>';
+
+    // 요약 칩
+    const tNet = tBuyCost - tSellRev;
+    html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">';
+    html += `<div class="day-chip" style="background:rgba(59,130,246,0.15);color:#60a5fa">발전 ${fN(tGenTotal)} kWh</div>`;
+    html += `<div class="day-chip" style="background:rgba(74,222,128,0.15);color:#4ade80">송전 ${fN(tSend)} kWh</div>`;
+    html += `<div class="day-chip" style="background:rgba(248,113,113,0.15);color:#f87171">수전 ${fN(tBuy)} kWh</div>`;
+    html += `<div class="day-chip" style="background:rgba(245,158,11,0.15);color:#f59e0b">대기전력 ${standbyH.toFixed(1)} kWh/h</div>`;
+    html += `<div class="day-chip" style="background:rgba(96,165,250,0.15);color:#60a5fa">전력매출 ${fW(tSellRev)} 만원</div>`;
+    html += `<div class="day-chip" style="background:rgba(248,113,113,0.15);color:#f87171">전력비 ${fW(tBuyCost)} 만원</div>`;
+    html += '</div>';
+
+    // 차트 뷰
+    html += '<div id="elecChartView"><canvas id="elecDayChart" height="260"></canvas></div>';
+
+    // 데이터 뷰
+    html += '<div id="elecDataView" style="display:none;overflow:auto;max-height:400px">';
+    html += '<table class="pv-tbl" style="font-size:11px;white-space:nowrap"><thead><tr>';
+    html += '<th>시간</th><th>수요<br><span style="color:#475569">(kWh)</span></th>';
+    html += '<th style="color:#60a5fa">발전<br><span style="color:#475569">(kWh)</span></th>';
+    html += '<th style="color:#4ade80">송전<br><span style="color:#475569">(kWh)</span></th>';
+    html += '<th>사내소비<br><span style="color:#475569">(kWh)</span></th>';
+    html += '<th style="color:#f87171">수전<br><span style="color:#475569">(kWh)</span></th>';
+    html += '<th>전력단가<br><span style="color:#475569">(원/kWh)</span></th>';
+    html += '<th>MP<br><span style="color:#475569">(원/kWh)</span></th>';
+    html += '<th style="color:#f87171">전력비<br><span style="color:#475569">(원)</span></th>';
+    html += '<th style="color:#60a5fa">전력매출<br><span style="color:#475569">(원)</span></th>';
+    html += '<th style="font-weight:700">순전력비<br><span style="color:#475569">(원)</span></th>';
+    html += '</tr></thead><tbody>';
+    hours.forEach(hr => {
+        const nc = hr.net > 0 ? '#f87171' : hr.net < 0 ? '#4ade80' : '#64748b';
+        html += `<tr><td style="text-align:center;font-weight:600">${hr.h}시</td>`;
+        html += `<td style="text-align:right;color:#c0c8d8">${fN(hr.demand)}</td>`;
+        html += `<td style="text-align:right;color:#60a5fa">${hr.genTotal > 0 ? fN(hr.genTotal) : '-'}</td>`;
+        html += `<td style="text-align:right;color:#4ade80">${hr.send > 0 ? fN(hr.send) : '-'}</td>`;
+        html += `<td style="text-align:right;color:#c0c8d8">${hr.selfUse > 0 ? fN(hr.selfUse) : '-'}</td>`;
+        html += `<td style="text-align:right;color:#f87171">${hr.buy > 0 ? fN(hr.buy) : '-'}</td>`;
+        html += `<td style="text-align:right;color:#c0c8d8">${hr.rate.toFixed(2)}</td>`;
+        html += `<td style="text-align:right;color:#c0c8d8">${hr.mp.toFixed(2)}</td>`;
+        html += `<td style="text-align:right;color:#f87171">${hr.buyCost > 0 ? fN(hr.buyCost) : '-'}</td>`;
+        html += `<td style="text-align:right;color:#60a5fa">${hr.sellRev > 0 ? fN(hr.sellRev) : '-'}</td>`;
+        html += `<td style="text-align:right;font-weight:600;color:${nc}">${fN(hr.net)}</td></tr>`;
+    });
+    // 합계
+    const sNC = tNet > 0 ? '#f87171' : '#4ade80';
+    html += `<tr style="font-weight:700;border-top:2px solid #334155;background:#1e293b"><td style="text-align:center">합계</td>`;
+    html += `<td style="text-align:right;color:#c0c8d8">${fN(tDemand)}</td>`;
+    html += `<td style="text-align:right;color:#60a5fa">${fN(tGenTotal)}</td>`;
+    html += `<td style="text-align:right;color:#4ade80">${fN(tSend)}</td>`;
+    html += `<td style="text-align:right;color:#c0c8d8">${fN(tSelf)}</td>`;
+    html += `<td style="text-align:right;color:#f87171">${fN(tBuy)}</td>`;
+    html += `<td style="text-align:right">-</td><td style="text-align:right">-</td>`;
+    html += `<td style="text-align:right;color:#f87171">${fN(tBuyCost)}</td>`;
+    html += `<td style="text-align:right;color:#60a5fa">${fN(tSellRev)}</td>`;
+    html += `<td style="text-align:right;font-weight:800;color:${sNC}">${fN(tNet)}</td></tr>`;
+    html += '</tbody></table></div>';
+
+    html += '</div>'; // modal-box
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.addEventListener('keydown', function _ek(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', _ek); } });
+
+    // 차트 렌더링
+    setTimeout(() => {
+        const ctx = document.getElementById('elecDayChart')?.getContext('2d');
+        if (!ctx) return;
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: hours.map(h => h.h + '시'),
+                datasets: [
+                    { label: '발전', data: hours.map(h => Math.round(h.genTotal)), backgroundColor: 'rgba(59,130,246,0.4)', borderColor: '#3b82f6', borderWidth: 1, order: 4 },
+                    { label: '전력수요', data: hours.map(h => Math.round(h.demand)), backgroundColor: 'rgba(107,114,128,0.3)', borderColor: '#6b7280', borderWidth: 1, order: 4 },
+                    { label: '송전', data: hours.map(h => Math.round(h.send)), type: 'line', borderColor: '#4ade80', borderWidth: 2, pointRadius: 2, fill: false, order: 2 },
+                    { label: '수전', data: hours.map(h => Math.round(h.buy)), type: 'line', borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 2, pointRadius: 3, fill: true, order: 1 },
+                    { label: '대기전력', data: Array(24).fill(Math.round(standbyH)), type: 'line', borderColor: '#f59e0b', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, order: 3 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(51,65,85,0.3)' } },
+                    y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => (v/1000).toFixed(0) + 'k' }, grid: { color: 'rgba(51,65,85,0.3)' }, title: { display: true, text: 'kWh', color: '#64748b' } },
+                }
+            }
+        });
+    }, 100);
+}
+
+function _switchElecView(view) {
+    document.getElementById('elecChartView').style.display = view === 'chart' ? '' : 'none';
+    document.getElementById('elecDataView').style.display = view === 'data' ? '' : 'none';
+    document.querySelectorAll('#elecDayModal .cd-tab').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#elecDayModal .cd-tab[data-elecview="${view}"]`)?.classList.add('active');
 }
 
 // ─── costTabs 탭 전환 시 현재 탭 기억 ───
@@ -7693,9 +8154,9 @@ function _renderCostDetailDaily(selMonth) {
     html += `<th >단가<br><span style="color:#475569">(원/Nm³)</span></th>`;
     html += `<th >가스비<br><span style="color:#475569">(만원)</span></th>`;
     html += `<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>`;
-    // 전력: MWh, 판매액, 검증, CP
-    html += '<th>발전<br><span style="color:#475569">(MWh)</span></th>';
-    html += '<th>판매액<br><span style="color:#475569">(만원)</span></th>';
+    // 전력: MWh, 전력매출, 검증, CP
+    html += '<th>송전<br><span style="color:#475569">(MWh)</span></th>';
+    html += '<th>전력매출<br><span style="color:#475569">(만원)</span></th>';
     html += '<th style="color:#4ade80">검증<br><span style="color:#475569">(만원)</span></th>';
     html += '<th>CP<br><span style="color:#475569">(만원)</span></th>';
     // 외부열원별: Gcal, 단가, 비용, 검증
@@ -7965,7 +8426,7 @@ function buildDailyTable(simResults, filterMonth) {
     html += '<th style="background:#e8eaf6">축방열</th>';
     html += '<th style="background:#fce4ec">CHP연료비</th>';
     html += '<th style="background:#fce4ec">기동비</th>';
-    html += '<th style="background:#e8f5e9">열제약매출</th>';
+    html += '<th style="background:#e8f5e9">전력매출</th>';
     html += '<th style="background:#fce4ec">CHP단가<br>원/Gcal</th>';
     html += '<th style="background:#fef3c7">PLB연료비</th>';
     html += '<th style="background:#fef3c7">PLB단가<br>원/Gcal</th>';
@@ -8018,7 +8479,7 @@ function buildDailyTable(simResults, filterMonth) {
         const deltaColor = stDelta > 0 ? 'color:#1565c0' : (stDelta < 0 ? 'color:#c62828' : 'color:#94a3b8');
         const deltaLabel = stDelta > 0 ? '+' : '';
         html += `<td style="background:#ede7f6;font-weight:600;${deltaColor}">${stDelta !== 0 ? deltaLabel + fmt(stDelta) : '-'}</td>`;
-        // 비용 (천원): CHP연료비 → 기동비 → 열제약매출 → CHP단가 → PLB연료비 → PLB단가 → 순비용
+        // 비용 (천원): CHP연료비 → 기동비 → 전력매출 → CHP단가 → PLB연료비 → PLB단가 → 순비용
         html += `<td style="background:#fef0f5">${r.chpFuelCost ? fmtK(r.chpFuelCost) : '-'}</td>`;
         html += `<td style="background:#fef0f5">${(r.startupCost || 0) > 0 ? fmtK(r.startupCost) : '-'}</td>`;
         html += `<td style="background:#f0fdf4;color:#15803d">${r.chpElecRev ? fmtK(r.chpElecRev) : '-'}</td>`;
